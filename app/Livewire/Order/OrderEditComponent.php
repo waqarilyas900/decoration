@@ -4,6 +4,7 @@ namespace App\Livewire\Order;
 
 use App\Models\Employee;
 use App\Models\Order;
+use App\Models\OrderAssignmentLog;
 use App\Models\OrderLog;
 use App\Models\OrderTrack;
 use Livewire\Component;
@@ -33,39 +34,75 @@ class OrderEditComponent extends Component
     public $getRemovedBy = [];
     public $employees = [];
     public $employeesCreated = [];
+     public $external_employees = [];
     public $updateView = true;
+    public $number_of_garments;
+    public $is_priority;
+    public $showSplitModal = false;
+    public $splitSection = '';
+    public $splitEntries = [];
+    public $splitQuantitiesPattern = null;
+    public $allSplitEntries = []; 
+    public $manuallyOverriddenSections = [];
+    public $assignments = [];
+
     public function mount()
     {
         $this->employees  = Employee::where('type', 1)
         ->where('is_delete', 0)
         ->orderBy('first_name', 'asc')
         ->where('active', 1)->get();
+         $this->external_employees = Employee::where('type', 2) 
+        ->where('active', 1)
+        ->where('is_delete', 0)
+        ->orderBy('first_name', 'asc')
+        ->get();
 
         $this->employeesCreated  = Employee::where('type', 1)
        
         ->orderBy('first_name', 'asc')
         ->where('active', 1)->get();
 
-        $this->order = Order::find($this->orderId); 
+        $this->order = Order::with('assignments')->find($this->orderId);
+
+        $this->allSplitEntries = [];
+
+        foreach (['Sewing', 'Embroidery', 'Imprinting'] as $section) {
+            $assignments = $this->order->assignments->where('section', $section);
+
+            if ($assignments->isNotEmpty()) {
+                $this->allSplitEntries[$section] = $assignments->map(function ($assignment) {
+                    return [
+                        'employee_id' => $assignment->employee_id,
+                        'quantity' => $assignment->garments_assigned,  
+                    ];
+                })->toArray();
+            }
+        }
         $this->need_sewing = $this->order->need_sewing ? true : false;
         $this->need_embroidery = (int)$this->order->need_embroidery ? true : false;
         $this->need_imprinting = (int)$this->order->need_imprinting ? true : false;
         $this->current_location = $this->order->current_location;
         $this->order_number = $this->order->order_number;
         $this->created_by = $this->order->created_by;
+        $this->number_of_garments = $this->order->number_of_garments;
+        $this->is_priority = $this->order->is_priority;
         // dd($this->current_location);
     }
     public function render()
     {  
         return view('livewire.order.order-edit-component');
     }
+
     public function save()
     {
-        if(!$this->need_sewing && !$this->need_embroidery && !$this->need_imprinting) {
+        if (!$this->need_sewing && !$this->need_embroidery && !$this->need_imprinting) {
             $this->current_location = null;
         }
-        $order = Order::where('id', $this->order->id)->first();
-        $validated = $this->validate( [
+
+        $order = Order::findOrFail($this->order->id);
+
+        $validated = $this->validate([
             'updated_by' => 'required',
             'current_location' => 'required',
             'need_sewing' => 'nullable',
@@ -75,86 +112,160 @@ class OrderEditComponent extends Component
             'imprinting_progress' => 'nullable',
             'embroidery_progress' => 'nullable',
         ]);
+
         unset($validated['updated_by']);
-        $ready = null;
-        if($this->confrmView) {
-            if((int) $order->need_sewing != (int)$this->need_sewing || (int) $order->need_imprinting != (int)$this->need_embroidery || (int) $order->need_embroidery != (int)$this->need_imprinting) 
-            {
-            $order->status = 0;
-            $order->update();
+
+        if ($this->confrmView) {
+
+            $resetStatus = false;
+
+            // Reset order status if any requirement has changed
+            if (
+                (int) $order->need_sewing !== (int) $this->need_sewing ||
+                (int) $order->need_imprinting !== (int) $this->need_imprinting ||
+                (int) $order->need_embroidery !== (int) $this->need_embroidery
+            ) {
+                $resetStatus = true;
             }
-            if( $order->need_sewing!=1 && $validated['need_sewing'] == 1) {
+
+            // Reset section if newly required
+            if ((int) $order->need_sewing !== 1 && (int) $this->need_sewing === 1) {
                 $validated['need_sewing'] = 2;
                 $validated['sewing_progress'] = 0;
                 OrderTrack::where('type', 1)->where('status', 0)->where('order_id', $order->id)->delete();
+                $resetStatus = true;
             }
-            if($order->need_imprinting!=1 && $validated['need_imprinting'] == 1) {
+
+            if ((int) $order->need_imprinting !== 1 && (int) $this->need_imprinting === 1) {
                 $validated['need_imprinting'] = 2;
                 $validated['imprinting_progress'] = 0;
                 OrderTrack::where('type', 3)->where('status', 0)->where('order_id', $order->id)->delete();
+                $resetStatus = true;
             }
-            if($order->need_embroidery!=1 && $validated['need_embroidery'] == 1) {
 
+            if ((int) $order->need_embroidery !== 1 && (int) $this->need_embroidery === 1) {
+                $validated['need_embroidery'] = 2;
                 $validated['embroidery_progress'] = 0;
                 OrderTrack::where('type', 2)->where('status', 0)->where('order_id', $order->id)->delete();
-                $validated['need_embroidery'] = 2;
+                $resetStatus = true;
             }
-            Order::where('id', $this->order->id)->update($validated);
-            $afterUpdateorder = Order::where('id', $this->order->id)->first();
-            // ///
-            $ready = 0;
-            $allCount = 0;
-            if($afterUpdateorder->need_sewing != 0) {
-                $allCount += 1;
+
+            if ($resetStatus) {
+                $order->status = 0;
+                $order->save();
             }
-            if($afterUpdateorder->need_embroidery != 0) {
-                $allCount += 1;
-            }
-            if($afterUpdateorder->need_imprinting != 0) {
-                $allCount += 1;
-            }
-            if($afterUpdateorder->need_sewing == 1) {
-                $ready += 1;
-            }
-            if($afterUpdateorder->need_embroidery == 1) {
-                $ready += 1;
-            }
-            if($afterUpdateorder->need_imprinting == 1) {
-                $ready += 1;
-            }
-           
-    
-            if($allCount == $ready) 
-            {
-                OrderLog::forceCreate([
-                    'title' => "Order marked as ready",
-                    'updated_by' => $this->updated_by,
-                    'order_id' => $afterUpdateorder->id
-                ]);
-                $afterUpdateorder->status = 1;
-                $afterUpdateorder->update();
-            }
-            else
-            {
-                OrderLog::forceCreate([
-                    'title' => "Order marked as pending",
-                    'updated_by' => $this->updated_by,
-                    'order_id' => $afterUpdateorder->id
-                ]);
-                $afterUpdateorder->status = 0;
-                $afterUpdateorder->update();
-            }
-            ///////
+
+            // Update main order record
+            $order->update($validated);
+
+            // Sync assignments and log them
+            $this->syncAssignmentsWithLogs($order);
+
+            // Check for readiness
+            $afterUpdateOrder = $order->fresh();
+
+            $required = collect([
+                'need_sewing' => $afterUpdateOrder->need_sewing,
+                'need_embroidery' => $afterUpdateOrder->need_embroidery,
+                'need_imprinting' => $afterUpdateOrder->need_imprinting,
+            ]);
+
+            $totalSteps = $required->filter(fn($val) => (int) $val > 0)->count();
+            $readySteps = $required->filter(fn($val) => (int) $val === 1)->count();
+
+            $afterUpdateOrder->status = ($totalSteps > 0 && $readySteps === $totalSteps) ? 1 : 0;
+            $afterUpdateOrder->save();
+
             OrderLog::forceCreate([
-                'order_id' => $afterUpdateorder->id,
-                'title' => 'order updated',
-                'updated_by' => $this->updated_by
-            ]);  
+                'order_id' => $order->id,
+                'title' => $afterUpdateOrder->status === 1 ? 'Order marked as ready' : 'Order marked as pending',
+                'updated_by' => $this->updated_by,
+            ]);
+
+            OrderLog::forceCreate([
+                'order_id' => $order->id,
+                'title' => 'Order updated',
+                'updated_by' => $this->updated_by,
+            ]);
 
             session()->flash('message', 'Order has been updated');
-            $this->confrmView = false;  
+            $this->confrmView = false;
         }
     }
+
+    public function syncAssignmentsWithLogs(Order $order)
+    {
+        $existingAssignments = $order->assignments()->get()->keyBy(function ($assignment) {
+            return $assignment->section . '_' . $assignment->employee_id;
+        });
+
+        $processedKeys = [];
+
+        foreach ($this->allSplitEntries as $section => $entries) {
+            foreach ($entries as $entry) {
+                if (!empty($entry['employee_id']) && !empty($entry['quantity'])) {
+                    $employeeId = $entry['employee_id'];
+                    $quantity = (int)$entry['quantity'];
+                    $key = $section . '_' . $employeeId;
+                    $processedKeys[] = $key;
+
+                    if ($existingAssignments->has($key)) {
+                        $existing = $existingAssignments->get($key);
+                        if ($existing->garments_assigned != $quantity) {
+                            $existing->update(['garments_assigned' => $quantity]);
+
+                            OrderAssignmentLog::create([
+                                'order_id' => $order->id,
+                                'assignment_id' => $existing->id,
+                                'employee_id' => $employeeId,
+                                'title' => "Assignment updated for $section",
+                                'updated_by' => $this->updated_by,
+                                'section' => $section,
+                                'garments_assigned' => $quantity,
+                                'status' => 'updated',
+                            ]);
+                        }
+                    } else {
+                        $assignment = $order->assignments()->create([
+                            'section' => $section,
+                            'employee_id' => $employeeId,
+                            'garments_assigned' => $quantity,
+                        ]);
+
+                        OrderAssignmentLog::create([
+                            'order_id' => $order->id,
+                            'assignment_id' => $assignment->id,
+                            'employee_id' => $employeeId,
+                            'title' => "Assigned to $section",
+                            'updated_by' => $this->updated_by,
+                            'section' => $section,
+                            'garments_assigned' => $quantity,
+                            'status' => 'assigned',
+                        ]);
+                    }
+                }
+            }
+        }
+
+        foreach ($existingAssignments as $key => $assignment) {
+            if (!in_array($key, $processedKeys)) {
+                $assignment->delete();
+
+                OrderAssignmentLog::create([
+                    'order_id' => $order->id,
+                    'assignment_id' => $assignment->id,
+                    'employee_id' => $assignment->employee_id,
+                    'title' => "Unassigned from {$assignment->section}",
+                    'updated_by' => $this->updated_by,
+                    'section' => $assignment->section,
+                    'garments_assigned' => 0,
+                    'status' => 'unassigned',
+                ]);
+            }
+        }
+    }
+
+
     public function confirmation($status)
     {
         if($status == "no") {
@@ -169,5 +280,164 @@ class OrderEditComponent extends Component
             $this->status = $status;
             $this->confrmView = true;
         }
+    }
+
+    public function openSplitModal($section)
+    {
+        $this->splitSection = $section;
+
+        // If already exists, use it
+        if (isset($this->allSplitEntries[$section])) {
+            $this->splitEntries = $this->allSplitEntries[$section];
+        }
+        // If not set but another section has pattern, use the first one found
+        elseif (!$this->splitQuantitiesPattern && !empty($this->allSplitEntries)) {
+            $firstSection = array_key_first($this->allSplitEntries);
+            $pattern = collect($this->allSplitEntries[$firstSection])->pluck('quantity')->map(fn($q) => (int) $q)->toArray();
+            $this->splitQuantitiesPattern = $pattern;
+            $this->splitEntries = collect($pattern)->map(fn($qty) => ['employee_id' => '', 'quantity' => $qty])->toArray();
+        }
+        // Else, fallback
+        elseif ($this->splitQuantitiesPattern) {
+            $this->splitEntries = collect($this->splitQuantitiesPattern)
+                ->map(fn($qty) => ['employee_id' => '', 'quantity' => $qty])
+                ->toArray();
+        } else {
+            $this->splitEntries = [['employee_id' => '', 'quantity' => '']];
+        }
+
+        $this->showSplitModal = true;
+    }
+
+     public function addSplitEntry()
+    {
+        $this->splitEntries[] = ['employee_id' => '', 'quantity' => ''];
+    }
+
+    public function removeSplitEntry($index)
+    {
+        unset($this->splitEntries[$index]);
+        $this->splitEntries = array_values($this->splitEntries);
+    }
+
+    public function updatedSplitEntries($value, $name)
+    {
+        $this->validateSplitEntriesTotal();
+
+        // Validate split matches initial pattern if set
+        if ($this->splitQuantitiesPattern) {
+            $this->validateSplitMatch();
+        }
+    }
+
+    public function validateSplitEntriesTotal()
+    {
+        $totalAssigned = collect($this->splitEntries)->sum(fn($entry) => (int) $entry['quantity']);
+
+        if ($totalAssigned > $this->number_of_garments) {
+            $this->addError('splitEntries', 'Total assigned garments exceed the number of garments specified.');
+        } else {
+            $this->resetErrorBag('splitEntries');
+        }
+    }
+
+    public function validateSplitMatch()
+    {
+        $currentQuantities = collect($this->splitEntries)->pluck('quantity')->map(fn($q) => (int) $q)->toArray();
+
+        if ($currentQuantities !== $this->splitQuantitiesPattern) {
+            $this->addError('splitEntries', 'Garment split quantities must match the first section\'s pattern.');
+        } else {
+            $this->resetErrorBag('splitEntries');
+        }
+    }
+
+    public function saveSplitAssignments()
+    {
+        $totalAssigned = collect($this->splitEntries)->sum(fn($entry) => (int) $entry['quantity']);
+
+        if ($totalAssigned > $this->number_of_garments) {
+            $this->addError('splitEntries', 'Total assigned garments exceed the number of garments specified.');
+            return;
+        }
+
+        foreach ($this->splitEntries as $entry) {
+            if (empty($entry['employee_id']) || empty($entry['quantity']) || $entry['quantity'] <= 0) {
+                $this->addError('splitEntries', 'Each split must have a valid employee and a positive garment quantity.');
+                return;
+            }
+        }
+
+        $quantities = collect($this->splitEntries)
+            ->pluck('quantity')
+            ->map(fn($q) => (int) $q)
+            ->toArray();
+
+        if (count($quantities) > 1 && count(array_unique($quantities)) === 1) {
+            $this->addError('splitEntries', 'Split quantities must not be equally divided.');
+            return;
+        }
+
+        // Save the first-used pattern
+        if (!$this->splitQuantitiesPattern) {
+            $this->splitQuantitiesPattern = $quantities;
+        }
+
+        // Save entries for this section
+        $this->allSplitEntries[$this->splitSection] = $this->splitEntries;
+
+        $this->resetErrorBag('splitEntries');
+        $this->showSplitModal = false;
+    }
+
+    public function updatedNeedSewing($value)
+    {
+        if (!$value) {
+            unset($this->allSplitEntries['Sewing']);
+
+            if ($this->splitSection === 'Sewing') {
+                $this->resetSplitModal();
+            }
+
+            $this->maybeResetSplitQuantitiesPattern();
+        }
+    }
+    public function updatedNeedEmbroidery($value)
+    {
+        if (!$value) {
+            unset($this->allSplitEntries['Embroidery']);
+
+            if ($this->splitSection === 'Embroidery') {
+                $this->resetSplitModal();
+            }
+
+            $this->maybeResetSplitQuantitiesPattern();
+        }
+    }
+
+    public function updatedNeedImprinting($value)
+    {
+        if (!$value) {
+            unset($this->allSplitEntries['Imprinting']);
+
+            if ($this->splitSection === 'Imprinting') {
+                $this->resetSplitModal();
+            }
+
+            $this->maybeResetSplitQuantitiesPattern();
+        }
+    }
+    protected function maybeResetSplitQuantitiesPattern()
+    {
+        if (empty($this->allSplitEntries)) {
+            $this->splitQuantitiesPattern = null;
+        }
+    }
+    protected function resetSplitModal()
+    {
+        $this->showSplitModal = false;
+        $this->splitSection = '';
+        $this->splitEntries = [];
+        $this->resetErrorBag('splitEntries');
     }
 }

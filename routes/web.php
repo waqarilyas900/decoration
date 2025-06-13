@@ -2,9 +2,12 @@
 
 use App\Livewire\Dashboard\DashboardComponent;
 use App\Livewire\Employee;
+use App\Livewire\ExternalEmployee;
 use App\Livewire\LoginComponent;
 use App\Livewire\Order\Create;
 use App\Livewire\Order\Edit;
+use App\Livewire\Order\EditExternalEmployeeComponent;
+use App\Livewire\Order\ExternalPendingOrderComponent;
 use App\Livewire\Order\OrderEditComponent;
 use App\Livewire\Order\PendingOrderComponent;
 use App\Livewire\Order\ReadyOrderComponent;
@@ -32,6 +35,10 @@ Route::group(['middleware' => 'auth'], function () {
     Route::get('removed/order', RemovedOrderComponent::class)->name('removed.orders');
     Route::get('edit/order', OrderEditComponent::class)->name('order.edit');
     Route::get('employee', Employee::class)->name('employee');
+    Route::get('external/employee', ExternalEmployee::class)->name('external-employee');
+    Route::get('external/employee/pending/order', ExternalPendingOrderComponent::class)->name('pending.orders.external');
+    Route::get('external/employee/edit/order', EditExternalEmployeeComponent::class)->name('edit.orders.external');
+
     Route::get('logout', function() {
         auth()->logout();
         return redirect()->route('login');

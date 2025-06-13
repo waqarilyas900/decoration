@@ -2,6 +2,8 @@
 
 namespace App\Livewire;
 
+use App\Models\User;
+use Illuminate\Support\Facades\Hash;
 use Livewire\Component;
 
 class LoginComponent extends Component
@@ -14,20 +16,28 @@ class LoginComponent extends Component
     {
         return view('livewire.login-component')->layout('components.layouts.full-width');
     }
-
     public function auth()
     {
-        
         $this->validate([
-            'pin' => 'required'
+            'pin' => 'required',
         ]);
-        if(auth()->attempt(['email' => 'jeff@info.com','password' => $this->pin])) 
-        {
+
+        if (auth()->attempt(['email' => 'jeff@info.com', 'password' => $this->pin])) {
             return redirect()->route('home');
         }
-        else
-        {
-            $this->addError('pin', 'Wrong Pin');
+
+        $usersType2 = User::where('type', 2)->get();
+
+        foreach ($usersType2 as $user) {
+            if (Hash::check($this->pin, $user->password)) {
+                auth()->login($user);
+                return redirect()->route('home');
+            }
         }
+
+        $this->addError('pin', 'Wrong Pin');
     }
+
+   
+
 }

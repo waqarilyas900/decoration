@@ -10,7 +10,11 @@
     </div>
     <hr class="horizontal dark mt-0">
     <div class="w-auto " id="sidenav-collapse-main">
+        @php
+            $user = auth()->user();
+        @endphp
         <ul class="navbar-nav">
+            @if ($user->type != 2)
             <li class="nav-item">
                 <a class="nav-link  {{ \Request::route()->getName() == 'order.create' ? 'active' : '' }}"
                     href="{{ route('order.create') }}">
@@ -69,10 +73,37 @@
                         <i class="fa fa-users text-lg opacity-10" aria-hidden="true"></i>
                     </div>
                     <span
-                        class="nav-link-text ms-1 h5 mb-0 {{ \Request::route()->getName() == 'employee' ? 'text-primary' : '' }}">EMPLOYEE MANAGEMENT
+                        class="nav-link-text ms-1 h5 mb-0 {{ \Request::route()->getName() == 'employee' ? 'text-primary' : '' }}">INTERNAL EMPLOYEE 
                         </span>
                 </a>
             </li>
+            <li class="nav-item mt-2">
+                <a class="nav-link  {{ \Request::route()->getName() == 'external/employee' ? 'active' : '' }}"
+                    href="{{ route('external-employee') }}">
+                    <div
+                        class="icon icon-shape icon-sm shadow border-radius-md  text-center me-2 d-flex align-items-center justify-content-center">
+                        <i class="fa fa-users text-lg opacity-10" aria-hidden="true"></i>
+                    </div>
+                    <span
+                        class="nav-link-text ms-1 h5 mb-0 {{ \Request::route()->getName() == 'external/employee' ? 'text-primary' : '' }}">EXTERNAL EMPLOYEE 
+                        </span>
+                </a>
+            </li>
+            @endif
+            @if ($user->type == 2)
+            <li class="nav-item mt-4">
+                <a class="nav-link  {{ \Request::route()->getName() == 'pending.orders.external' ? 'active' : '' }}"
+                    href="{{ route('pending.orders.external') }}">
+                    <div
+                        class="icon icon-shape icon-sm shadow border-radius-md  text-center me-2 d-flex align-items-center justify-content-center">
+                        <i class="ni ni-cart text-lg opacity-10" aria-hidden="true"></i>
+                    </div>
+                    <span
+                        class="nav-link-text ms-1 h5 mb-0 {{ \Request::route()->getName() == 'pending.orders.external' ? 'text-primary' : '' }}">PENDING
+                        ORDERS</span>
+                </a>
+            </li>
+            @endif
             <li class="nav-item mt-2">
                 <a class="nav-link" href="{{ route('logout') }}">
                     <div

@@ -98,58 +98,97 @@
                         <hr class="hr hr-blurry" />
 
                         <div class="row">
+                            <!-- First Name -->
                             <div class="col-md-6">
                                 <div class="mb-0">
                                     <label for="first_name" class="form-label h5">FIRST NAME</label>
-                                    <input type="text" class="form-control" id="first_name"
-                                        aria-describedby="first_name" wire:model="record.first_name">
-                                    <div id="first_name" class="form-text text-danger mb-4">
+                                    <input type="text" class="form-control" id="first_name" aria-describedby="first_name"
+                                        wire:model="record.first_name">
+                                    <div class="form-text text-danger mb-4">
                                         @error('record.first_name')
-                                        <b> {{ $message }}</b>
+                                            <b>{{ $message }}</b>
                                         @enderror
                                     </div>
                                 </div>
                             </div>
+
+                            <!-- Last Name -->
                             <div class="col-md-6">
                                 <div class="mb-0">
                                     <label for="last_name" class="form-label h5">LAST NAME</label>
                                     <input type="text" class="form-control" id="last_name" aria-describedby="last_name"
                                         wire:model="record.last_name">
-                                    <div id="last_name" class="form-text text-danger mb-4">
+                                    <div class="form-text text-danger mb-4">
                                         @error('record.last_name')
-                                        <b> {{ $message }}</b>
+                                            <b>{{ $message }}</b>
                                         @enderror
                                     </div>
                                 </div>
                             </div>
+
+                            <!-- PIN -->
                             <div class="col-md-6">
                                 <div class="mb-0">
-                                    <label for="email" class="form-label h5">EMAIL</label>
-                                    <input type="text" class="form-control" id="email" aria-describedby="email"
-                                        wire:model="record.email">
-                                    <div id="email" class="form-text text-danger mb-4">
-                                        @error('record.email')
-                                        <b> {{ $message }}</b>
+                                    <label for="pin" class="form-label h5">PIN</label>
+                                    <input type="password" class="form-control" id="pin" aria-describedby="pin" wire:model="record.pin">
+                                    <div class="form-text text-danger mb-4">
+                                        @error('record.pin')
+                                            <b>{{ $message }}</b>
                                         @enderror
                                     </div>
                                 </div>
                             </div>
-                            {{-- <div class="col-md-6">
+
+                            <!-- Working Hours Start -->
+                            <div class="col-md-6">
                                 <div class="mb-0">
-                                    <label for="type" class="form-label h5">Type</label>
-                                    <select wire:model="record.type" class="form-control">
-                                        <option value="">Select</option>
-                                        <option value="1">Internal</option>
-                                        <option value="2">External</option>
-                                    </select>
-                                    <div id="type" class="form-text text-danger mb-4">
-                                        @error('record.type')
-                                        <b> {{ $message }}</b>
+                                    <label for="working_hours_start" class="form-label h5">WORKING HOURS START</label>
+                                    <input type="time" class="form-control" id="working_hours_start" wire:model="record.working_hours_start">
+                                    <div class="form-text text-danger mb-4">
+                                        @error('record.working_hours_start')
+                                            <b>{{ $message }}</b>
                                         @enderror
                                     </div>
                                 </div>
-                            </div> --}}
+                            </div>
+
+                            <!-- Working Hours End -->
+                            <div class="col-md-6">
+                                <div class="mb-0">
+                                    <label for="working_hours_end" class="form-label h5">WORKING HOURS END</label>
+                                    <input type="time" class="form-control" id="working_hours_end" wire:model="record.working_hours_end">
+                                    <div class="form-text text-danger mb-4">
+                                        @error('record.working_hours_end')
+                                            <b>{{ $message }}</b>
+                                        @enderror
+                                    </div>
+                                </div>
+                            </div>
+
+                            <!-- Time per Garment -->
+                            <div class="col-md-6">
+                                <div class="mb-0">
+                                    <label class="form-label h5">TIME PER GARMENT</label>
+                                    <div class="d-flex gap-2 align-items-center">
+                                        <input type="number" min="0" class="form-control" style="width: 100px;"
+                                            placeholder="Hours" wire:model="time_per_garment_hours">
+
+                                        <span class="h5 m-0">:</span>
+
+                                        <input type="number" min="0" max="59" class="form-control" style="width: 100px;"
+                                            placeholder="Minutes" wire:model="time_per_garment_minutes">
+                                    </div>
+
+                                    <div class="form-text text-danger mb-4">
+                                        @error('time_per_garment_hours') <b>{{ $message }}</b> @enderror
+                                        @error('time_per_garment_minutes') <b>{{ $message }}</b> @enderror
+                                    </div>
+                                </div>
+                            </div>
+
+
                         </div>
+
                         <hr>
                         <div class="row">
                         </div>

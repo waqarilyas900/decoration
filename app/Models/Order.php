@@ -7,15 +7,21 @@ use Illuminate\Database\Eloquent\Model;
 
 class Order extends Model
 {
+    use HasFactory;
     protected $fillable = [
         'order_number',
         'need_sewing',
         'need_embroidery',
         'need_imprinting',
         'current_location',
-        'current_location',
+        'number_of_garments',
+        'created_by',
+        'status',
+        'is_priority',
     ];
-
+    protected $casts = [
+        'is_priority' => 'boolean',
+    ];
     public function employee()
     {
         return $this->belongsTo(Employee::class, 'created_by');
@@ -34,7 +40,11 @@ class Order extends Model
     {
         return $this->hasOne(OrderLog::class, 'order_id')->where('removed_by', '!=', null);
     }
-    use HasFactory;
+    
+    public function assignments()
+    {
+        return $this->hasMany(OrderAssignment::class);
+    }
 
     public function scopeSearchLike($query, $columns, $keyword)
     {
