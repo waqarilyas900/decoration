@@ -28,8 +28,9 @@
                                     <div class="col-md-12 mt-3">
                                         <div class="mb-0">
                                             <label for="number_of_garments" class="form-label h5">NUMBER OF GARMENTS</label>
-                                            <input type="number" class="form-control" id="number_of_garments"
-                                                wire:model.blur="number_of_garments">
+                                            <input type="number" class="form-control" wire:model.blur="number_of_garments"
+    {{ $isExternal ? 'disabled' : '' }}>
+
                                             @error('number_of_garments')
                                             <div class="form-text text-danger">
                                                 <b>{{ $message }}</b>
@@ -41,15 +42,17 @@
                                     <!-- Priority Checkbox -->
                                     <div class="col-md-12 mt-3">
                                         <div class="form-check d-flex align-items-center gap-2">
-                                            <input class="form-check-input" type="checkbox" id="priority"
-                                                wire:model.live="is_priority">
+                                            <input type="checkbox" wire:model.live="is_priority"
+    {{ $isExternal ? 'disabled' : '' }}>
+
                                             <label class="form-check-label h5 mt-2" for="priority">PRIORITY</label>
                                         </div>
                                     </div>
                                     <div class="col-md-12 mt-3">
                                         <label for="current_location" class="form-label h5">CURRENT LOCATION</label>
-                                        <select wire:model.live="current_location" class="form-select form-select-lg"
-                                            aria-label=".form-select-lg example" id="current_location">
+                                        <select class="form-select form-select-lg" wire:model.live="current_location"
+    {{ $isExternal ? 'disabled' : '' }}>
+
                                             <option selected>SELECT CURRENT LOCATION</option>
                                             @if($need_sewing)
                                             <option value="Sewing">Sewing</option>
@@ -86,24 +89,7 @@
                                             @enderror
                                         </div>
                                     </div>
-                                    <div class="col-md-12 mt-3">
-                                        <div class="mb-3">
-                                            <label for="updated_by" class="form-label h5">UPDATED BY</label>
-                                            <select wire:model.live="updated_by" class="form-select form-select-lg"
-                                                aria-label=".form-select-lg example" id="updated_by">
-                                                <option selected>SELECT EMPLOYEE</option>
-                                                @foreach($employees as $employee)
-                                                <option value="{{ $employee->id }}">
-                                                    {{ $employee->first_name . ' ' . $employee->last_name }}</option>
-                                                @endforeach
-                                            </select>
-                                            @error('updated_by')
-                                            <div id="updated_by" class="form-text text-danger">
-                                                <b> {{ $message }}</b>
-                                            </div>
-                                            @enderror
-                                        </div>
-                                    </div>
+
                                 </div>
                             </div>
                             <div class="col-md-6 mt-4">
@@ -116,7 +102,7 @@
                                                 Sewing</label>
                                                  @if( $need_sewing)
                                         <button type="button" class="btn btn-sm btn-outline-primary ms-2"
-                                                wire:click="openSplitModal('Sewing')">Assign</button>
+                                                wire:click="openSplitModal('Sewing')">Assigned</button>
                                     @endif
                                         </div>
                                         <div class="form-check mb-3 d-flex align-item-center gap-3">
@@ -126,7 +112,7 @@
                                                 Embroidery</label>
                                                   @if( $need_embroidery)
                                         <button type="button" class="btn btn-sm btn-outline-primary ms-2"
-                                                wire:click="openSplitModal('Embroidery')">Assign</button>
+                                                wire:click="openSplitModal('Embroidery')">Assigned</button>
                                     @endif
                                         </div>
                                         <div class="form-check mb-3 d-flex align-item-center gap-3">
@@ -136,7 +122,7 @@
                                                 Imprinting</label>
                                                  @if( $need_imprinting)
                                         <button type="button" class="btn btn-sm btn-outline-primary ms-2"
-                                                wire:click="openSplitModal('Imprinting')">Assign</button>
+                                                wire:click="openSplitModal('Imprinting')">Assigned</button>
                                     @endif
                                         </div>
                                     </div>
@@ -246,17 +232,7 @@
                         </div>
                         <div class="row">
                         </div>
-                        @if(!$confrmView)
-                        <button type="submit" class="btn btn-primary btn-cutom"
-                            wire:click="confirmation('update')">Update</button>
-                        @endif
-                        @if($confrmView)
-                        <div class="alert alert-success" role="alert">
-                            <b class="text-white"> Are you sure want to continue</b>
-                            <button type="submit" class="btn btn-primary" wire:click="save">Yes</button>
-                            <button type="submit" class="btn btn-danger" wire:click="confirmation('no')">No</button>
-                        </div>
-                        @endif
+                       
                     </div>
                 </div>
                 <div class="table-responsive p-0">
@@ -295,52 +271,50 @@
             </div>
         </div>
     </div>
-    @if($showSplitModal)
-        <div class="modal fade show d-block" style="background: rgba(0,0,0,0.5);" tabindex="-1">
-            <div class="modal-dialog modal-lg modal-dialog-centered">
-                <div class="modal-content">
-                    <div class="modal-header">
-                        <h5 class="modal-title">Assignee {{ ucfirst($splitSection) }} Work</h5>
-                        <button type="button" class="btn-close" wire:click="$set('showSplitModal', false)"></button>
-                    </div>
-                    <div class="modal-body">
-                        @foreach($splitEntries as $index => $entry)
-                            <div class="row mb-2 align-items-center">
-                                <div class="col-md-6">
-                                    <select class="form-select" wire:model="splitEntries.{{ $index }}.employee_id">
-                                        <option value="">Select Employee</option>
-                                        @foreach($external_employees as $employee)
-                                            <option value="{{ $employee->id }}">
-                                                {{ $employee->first_name }} {{ $employee->last_name }}
-                                            </option>
-                                        @endforeach
-                                    </select>
-                                </div>
-                                <div class="col-md-4">
-                                    <input type="number" class="form-control"
-                                        placeholder="Garments"
-                                        wire:model="splitEntries.{{ $index }}.quantity">
-                                </div>
-                                <div class="col-md-2">
-                                    <button class="btn btn-danger" wire:click="removeSplitEntry({{ $index }})">Remove</button>
-                                </div>
+   
+@if($showSplitModal)
+    <div class="modal fade show d-block" style="background: rgba(0,0,0,0.5);" tabindex="-1">
+        <div class="modal-dialog modal-lg modal-dialog-centered">
+            <div class="modal-content">
+                <div class="modal-header">
+                    <h5 class="modal-title">Assignee {{ ucfirst($splitSection) }} Work</h5>
+                    <button type="button" class="btn-close" wire:click="$set('showSplitModal', false)"></button>
+                </div>
+                <div class="modal-body">
+
+                    @foreach($splitEntries as $index => $entry)
+                        <div class="row mb-2 align-items-center">
+                            <div class="col-md-6">
+                                @php
+                                    $employee = $external_employees->firstWhere('id', $entry['employee_id']);
+                                @endphp
+                                <input type="text" class="form-control" value="{{ $employee ? $employee->first_name . ' ' . $employee->last_name : 'Unknown' }}" disabled>
+                                {{-- Or if you want editable dropdown, replace above with your <select> --}}
                             </div>
-                        @endforeach
+                            <div class="col-md-4">
+                                <input type="number" class="form-control" placeholder="Garments" wire:model="splitEntries.{{ $index }}.quantity">
+                            </div>
+                            {{-- <div class="col-md-2">
+                                <button class="btn btn-danger" wire:click="removeSplitEntry({{ $index }})">Remove</button>
+                            </div> --}}
+                        </div>
+                    @endforeach
 
-                        <button class="btn btn-sm btn-outline-secondary mt-3" wire:click="addSplitEntry">
-                            + Add Assignee
-                        </button>
+                   
 
-                        @error('splitEntries')
+                    @error('splitEntries')
                         <div class="text-danger mt-2"><strong>{{ $message }}</strong></div>
-                        @enderror
-                    </div>
-                    <div class="modal-footer">
-                        <button class="btn btn-secondary" wire:click="$set('showSplitModal', false)">Cancel</button>
-                        <button class="btn btn-primary" wire:click="saveSplitAssignments">Assign</button>
-                    </div>
+                    @enderror
+
+                </div>
+                <div class="modal-footer">
+                    <button class="btn btn-secondary" wire:click="$set('showSplitModal', false)">Cancel</button>
+                    {{-- <button class="btn btn-primary" wire:click="saveSplitAssignments">Assign</button> --}}
                 </div>
             </div>
         </div>
-    @endif
+    </div>
+@endif
+
+
 </div>

@@ -56,23 +56,56 @@ class PendingOrderComponent extends Component
     }
     public function orders()
     {
-       
-        $order =  Order::where('status', 0);
-        if($this->sort) {
-           $order->orderBy($this->sort, $this->orderBy);
-        }else{
-            $order->oldest();
+        $order = Order::where('status', 0);
+        $user = auth()->user();
+
+        if ($user->type == 2) {
+            $employeeId = $user->employee_id;
+
+            // Get all sections the employee is assigned to
+            $assignedSections = \App\Models\OrderAssignment::where('employee_id', $employeeId)
+                ->pluck('section')
+                ->toArray();
+
+            $order->where(function ($q) use ($employeeId, $assignedSections) {
+                // Case 1: Show if current_location matches employee's assigned section
+                $q->whereHas('assignments', function ($q2) use ($employeeId) {
+                    $q2->where('employee_id', $employeeId);
+                })->whereIn('current_location', $assignedSections);
+            })->orWhere(function ($q) use ($employeeId) {
+                // Case 2: Previous stage completed, employee assigned for next stage
+                $q->whereHas('assignments', function ($q2) use ($employeeId) {
+                    $q2->where('employee_id', $employeeId);
+                })->where(function ($inner) {
+                    $inner->where('need_sewing', 1)
+                        ->orWhere('need_embroidery', 1)
+                        ->orWhere('need_imprinting', 1);
+                });
+            });
         }
-        if($this->location) {
+
+        if ($this->sort) {
+            $order->orderBy($this->sort, $this->orderBy);
+        } else {
+            // $order->oldest();
+            $order->orderByDesc('is_priority')  // Show priority orders on top
+                ->orderBy('created_at', 'asc');
+        }
+
+        if ($this->location) {
             $order->where('current_location', $this->location);
         }
+
         if (strlen($this->search) > 3) {
             $search = $this->search;
             $columns = ['order_number', 'current_location'];
             $order->searchLike($columns, $search);
         }
+
         return $order;
     }
+
+
     public function sortData($sort, $orderBy)
     {
         $this->orderBy = $orderBy;

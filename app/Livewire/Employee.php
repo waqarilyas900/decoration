@@ -23,7 +23,7 @@ class Employee extends Component
     }
     public function getEmployees()
     {
-        $queyr = ModelsEmployee::where('is_delete', 0);
+        $queyr = ModelsEmployee::where('is_delete', 0)->where('type', 1);
         if (strlen($this->search) > 3) {
             $search = $this->search;
             $columns = ['first_name', 'last_name', 'email'];
@@ -38,7 +38,9 @@ class Employee extends Component
     }   
     public function bindModel()
     {
-        $this->record = new ModelsEmployee();
+        $this->record = new ModelsEmployee([
+            'type' => 1
+        ]);
     }
     public function render()
     {
@@ -50,24 +52,21 @@ class Employee extends Component
     {
         $this->validate();
 
-        if($this->record->id) { 
-            $message = 'updated';
-        }else{
-            $message = 'created';
-        }
-       
+        $this->record->type = 1; // Ensure type is always 1 (internal)
+
+        $message = $this->record->id ? 'updated' : 'created';
+
         $this->record->save();
-        
-            session()->flash('message', "Employee has been $message.");
-        
-       
+
+        session()->flash('message', "Employee has been $message.");
+
         $this->bindModel();
         $this->type = 'view';
     }
-    
+
     public function edit($id)
     {
-        $this->record = ModelsEmployee::find($id);
+        $this->record = ModelsEmployee::where('type', 1)->find($id);
         $this->type = 'add';
     }
     public function addReset()
@@ -78,7 +77,7 @@ class Employee extends Component
 
     public function deleteRecord($id)
     {
-        ModelsEmployee::find($id)->update([
+        ModelsEmployee::where('type', 2)->find($id)->update([
             'is_delete' => 1
         ]);
     }

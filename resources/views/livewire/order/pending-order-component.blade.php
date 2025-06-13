@@ -57,7 +57,7 @@
                             </thead>
                             <tbody>
                                 @foreach($orders as $order)
-                                <tr>
+                                <tr @if($order->is_priority) style="background-color: #f8d7da;" @endif>
                                     <td>
                                         <h6>{{ date('m-d-Y', strtotime($order->created_at)) }}</h6>
                                     </td>

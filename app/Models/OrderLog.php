@@ -8,6 +8,11 @@ use Illuminate\Database\Eloquent\Model;
 class OrderLog extends Model
 {
     use HasFactory;
+
+    protected $fillable = [
+        'order_id',
+        'title',
+    ];
     public function user()
     {
         return $this->belongsTo(Employee::class, 'updated_by');
