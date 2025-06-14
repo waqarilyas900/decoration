@@ -45,6 +45,7 @@ class OrderEditComponent extends Component
     public $allSplitEntries = []; 
     public $manuallyOverriddenSections = [];
     public $assignments = [];
+     public $pendingOrdersPerEmployee = []; 
 
     public function mount()
     {
@@ -63,7 +64,7 @@ class OrderEditComponent extends Component
         ->orderBy('first_name', 'asc')
         ->where('active', 1)->get();
 
-        $this->order = Order::with('assignments')->find($this->orderId);
+        $this->order = Order::with(['assignments', 'logs.user', 'assignmentLogs.employee'])->find($this->orderId);
 
         $this->allSplitEntries = [];
 
@@ -89,6 +90,16 @@ class OrderEditComponent extends Component
         $this->is_priority = $this->order->is_priority;
         // dd($this->current_location);
     }
+     public function getPendingOrdersCountPerEmployee()
+    {
+        return \App\Models\OrderAssignment::query()
+            ->select('employee_id')
+            ->selectRaw('COUNT(DISTINCT order_id) as pending_count')
+            ->where('is_complete', 0)  // pending assignments only
+            ->groupBy('employee_id')
+            ->pluck('pending_count', 'employee_id')
+            ->toArray();
+    }
     public function render()
     {  
         return view('livewire.order.order-edit-component');
@@ -111,12 +122,40 @@ class OrderEditComponent extends Component
             'sewing_progress' => 'nullable',
             'imprinting_progress' => 'nullable',
             'embroidery_progress' => 'nullable',
+            'is_priority' => 'nullable|boolean',
+            'number_of_garments' => 'nullable|integer|min:1', 
         ]);
 
         unset($validated['updated_by']);
 
         if ($this->confrmView) {
+            $requiredSections = collect([
+                    'Sewing' => $this->need_sewing,
+                    'Embroidery' => $this->need_embroidery,
+                    'Imprinting' => $this->need_imprinting,
+                ])->filter(fn($val) => (int)$val === 1); // only required ones
 
+        foreach ($requiredSections as $section => $required) {
+            $entries = $this->allSplitEntries[$section] ?? [];
+
+            if (empty($entries)) {
+                $this->addError('splitEntries', "Please assign employees for the {$section} section.");
+                return;
+            }
+
+            foreach ($entries as $entry) {
+                if (empty($entry['employee_id']) || empty($entry['quantity']) || (int)$entry['quantity'] <= 0) {
+                    $this->addError('splitEntries', "Each {$section} assignment must have a valid employee and quantity.");
+                    return;
+                }
+            }
+
+            // Check for duplicate employees within the section
+            $employeeIds = collect($entries)->pluck('employee_id');
+            if ($employeeIds->count() !== $employeeIds->unique()->count()) {
+                $this->addError('splitEntries', "Each employee in the {$section} section must be assigned only once.");
+                return;
+            }}
             $resetStatus = false;
 
             // Reset order status if any requirement has changed
@@ -284,6 +323,7 @@ class OrderEditComponent extends Component
 
     public function openSplitModal($section)
     {
+        $this->resetErrorBag();
         $this->splitSection = $section;
 
         // If already exists, use it
@@ -355,7 +395,10 @@ class OrderEditComponent extends Component
     public function saveSplitAssignments()
     {
         $totalAssigned = collect($this->splitEntries)->sum(fn($entry) => (int) $entry['quantity']);
-
+        if ($totalAssigned !== (int) $this->number_of_garments) {
+            $this->addError('splitEntries', 'Total assigned garments must exactly match the number of garments specified ('.$this->number_of_garments.').');
+            return;
+        }
         if ($totalAssigned > $this->number_of_garments) {
             $this->addError('splitEntries', 'Total assigned garments exceed the number of garments specified.');
             return;
@@ -373,10 +416,10 @@ class OrderEditComponent extends Component
             ->map(fn($q) => (int) $q)
             ->toArray();
 
-        if (count($quantities) > 1 && count(array_unique($quantities)) === 1) {
-            $this->addError('splitEntries', 'Split quantities must not be equally divided.');
-            return;
-        }
+        // if (count($quantities) > 1 && count(array_unique($quantities)) === 1) {
+        //     $this->addError('splitEntries', 'Split quantities must not be equally divided.');
+        //     return;
+        // }
 
         // Save the first-used pattern
         if (!$this->splitQuantitiesPattern) {

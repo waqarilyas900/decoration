@@ -31,6 +31,10 @@ class Order extends Model
     {
        return $this->hasMany(OrderLog::class);
     }
+    public function assignmentLogs()
+    {
+        return $this->hasMany(OrderAssignmentLog::class);
+    }
     public function track()
     {
        return $this->hasMany(OrderTrack::class, 'order_id');

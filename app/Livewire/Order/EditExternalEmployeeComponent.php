@@ -50,82 +50,79 @@ class EditExternalEmployeeComponent extends Component
     public $isExternal = false;
     public $splitEntriesOthers = [];
 
-   public function mount()
-{
-    $this->isExternal = auth()->user()->type == 2;
+    public function mount()
+    {
+        $this->isExternal = auth()->user()->type == 2;
 
-    $this->employees = Employee::where('type', 1)
-        ->where('is_delete', 0)
-        ->where('active', 1)
-        ->orderBy('first_name', 'asc')
-        ->get();
+        $this->employees = Employee::where('type', 1)
+            ->where('is_delete', 0)
+            ->where('active', 1)
+            ->orderBy('first_name', 'asc')
+            ->get();
 
-    $this->external_employees = Employee::where('type', 2)
-        ->where('active', 1)
-        ->where('is_delete', 0)
-        ->orderBy('first_name', 'asc')
-        ->get();
+        $this->external_employees = Employee::where('type', 2)
+            ->where('active', 1)
+            ->where('is_delete', 0)
+            ->orderBy('first_name', 'asc')
+            ->get();
 
-    $this->employeesCreated = Employee::where('type', 1)
-        ->where('active', 1)
-        ->orderBy('first_name', 'asc')
-        ->get();
+        $this->employeesCreated = Employee::where('type', 1)
+            ->where('active', 1)
+            ->orderBy('first_name', 'asc')
+            ->get();
 
-    $this->order = Order::with('assignments')->find($this->orderId);
+        $this->order = Order::with('assignments')->find($this->orderId);
 
-    $this->allSplitEntries = [];
+        $this->allSplitEntries = [];
 
-    foreach (['sewing', 'embroidery', 'imprinting'] as $section) {
-        $assignments = $this->order->assignments->where('section', $section);
+        foreach (['Sewing', 'Embroidery', 'Imprinting'] as $section) {
+            $assignments = $this->order->assignments->where('section', $section);
 
-        if ($assignments->isNotEmpty()) {
-            $this->allSplitEntries[$section] = $assignments->map(function ($assignment) {
-                return [
-                    'employee_id' => $assignment->employee_id,
-                    'quantity' => $assignment->garments_assigned,
-                ];
-            })->toArray();
+            if ($assignments->isNotEmpty()) {
+                $this->allSplitEntries[$section] = $assignments->map(function ($assignment) {
+                    return [
+                        'employee_id' => $assignment->employee_id,
+                        'quantity' => $assignment->garments_assigned,
+                    ];
+                })->toArray();
+            }
         }
+
+        $this->need_sewing = (bool) $this->order->need_sewing;
+        $this->need_embroidery = (bool) $this->order->need_embroidery;
+        $this->need_imprinting = (bool) $this->order->need_imprinting;
+        $this->current_location = $this->order->current_location;
+        $this->order_number = $this->order->order_number;
+        $this->created_by = $this->order->created_by;
+        $this->number_of_garments = $this->order->number_of_garments;
+        $this->is_priority = $this->order->is_priority;
     }
 
-    $this->need_sewing = (bool) $this->order->need_sewing;
-    $this->need_embroidery = (bool) $this->order->need_embroidery;
-    $this->need_imprinting = (bool) $this->order->need_imprinting;
-    $this->current_location = $this->order->current_location;
-    $this->order_number = $this->order->order_number;
-    $this->created_by = $this->order->created_by;
-    $this->number_of_garments = $this->order->number_of_garments;
-    $this->is_priority = $this->order->is_priority;
-}
+    public function openSplitModal($section)
+    {
+        $this->splitSection = $section;
 
-public function openSplitModal($section)
-{
-    $this->splitSection = $section;
+        // Get logged-in user's employee_id, not the user id
+        $employeeId = auth()->user()->employee_id;
 
-    // Get logged-in user's employee_id, not the user id
-    $employeeId = auth()->user()->employee_id;
+        $this->splitEntries = [];
 
-    $this->splitEntries = [];
+        if (isset($this->allSplitEntries[$section])) {
+            // Filter only entries assigned to logged-in user's employee_id
+            $this->splitEntries = collect($this->allSplitEntries[$section])
+                ->where('employee_id', $employeeId)
+                ->values()
+                ->toArray();
 
-    if (isset($this->allSplitEntries[$section])) {
-        // Filter only entries assigned to logged-in user's employee_id
-        $this->splitEntries = collect($this->allSplitEntries[$section])
-            ->where('employee_id', $employeeId)
-            ->values()
-            ->toArray();
-
-        if (empty($this->splitEntries)) {
+            if (empty($this->splitEntries)) {
+                $this->splitEntries = [['employee_id' => $employeeId, 'quantity' => '']];
+            }
+        } else {
             $this->splitEntries = [['employee_id' => $employeeId, 'quantity' => '']];
         }
-    } else {
-        $this->splitEntries = [['employee_id' => $employeeId, 'quantity' => '']];
+
+        $this->showSplitModal = true;
     }
-
-    $this->showSplitModal = true;
-}
-
-
-
 
      public function addSplitEntry()
     {

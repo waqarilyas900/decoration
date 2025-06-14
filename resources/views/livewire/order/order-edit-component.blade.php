@@ -7,6 +7,7 @@
             </div>
             @endif
             <div class="card">
+                
                 <div class="card body p-4">
                     <div>
                         <hr class="hr hr-blurry" />
@@ -140,6 +141,16 @@
                                     @endif
                                         </div>
                                     </div>
+                                     @if ($errors->any())
+                                        <div class="mb-4 p-4 rounded-lg bg-red-100 border border-red-400 text-red-700">
+                                            {{-- <strong>Whoops! Something went wrong.</strong> --}}
+                                            <ul class="mt-2 list-disc list-inside text-sm">
+                                                @foreach ($errors->all() as $error)
+                                                    <li style="color: red">{{ $error }}</li>
+                                                @endforeach
+                                            </ul>
+                                        </div>
+                                    @endif
                                     <div class="col-md-12 mt-3">
                                         <div class="table-responsive p-0">
                                             <table class="table align-items-center mb-0">
@@ -260,7 +271,7 @@
                     </div>
                 </div>
                 <div class="table-responsive p-0">
-                    <table class="table align-items-center mb-0">
+                    {{-- <table class="table align-items-center mb-0">
                         <thead>
                             <tr>
                                 <th class="text-uppercase text-secondary text-xxs font-weight-bolder opacity-7">Title
@@ -290,7 +301,46 @@
                             </tr>
                             @endforeach
                         </tbody>
-                    </table>
+                    </table> --}}
+                  <h5>📋 Order & Assignment Logs</h5>
+<table class="table table-sm table-bordered">
+    <thead>
+        <tr>
+            <th>Type</th>
+            <th>Title</th>
+            <th>User</th>
+            <th>Garments</th>
+            <th>Time</th>
+        </tr>
+    </thead>
+    <tbody>
+        {{-- 📝 Order Logs --}}
+        @foreach($order->logs as $item)
+            <tr>
+                <td>📝 Order</td>
+                <td>{{ $item->title }}</td>
+                <td>{{ $item->user?->first_name }} {{ $item->user?->last_name }}</td>
+                <td>-</td>
+                <td class="text-center">{{ $item->created_at->format('d-m-Y h:i A') }}</td>
+            </tr>
+        @endforeach
+
+        {{-- 👷 Assignment Logs --}}
+        @foreach($order->assignmentLogs as $log)
+            <tr>
+                <td>👷 Assignment</td>
+                <td>{{ $log->title }}</td>
+                <td>{{ $log->employee?->first_name }} {{ $log->employee?->last_name }}</td>
+                <td>
+                   {{ $log->garments_assigned }}
+                </td>
+                <td class="text-center">{{ $log->created_at->format('d-m-Y h:i A') }}</td>
+            </tr>
+        @endforeach
+    </tbody>
+</table>
+
+
                 </div>
             </div>
         </div>
@@ -307,12 +357,36 @@
                         @foreach($splitEntries as $index => $entry)
                             <div class="row mb-2 align-items-center">
                                 <div class="col-md-6">
-                                    <select class="form-select" wire:model="splitEntries.{{ $index }}.employee_id">
+                                    {{-- <select class="form-select" wire:model="splitEntries.{{ $index }}.employee_id">
                                         <option value="">Select Employee</option>
                                         @foreach($external_employees as $employee)
                                             <option value="{{ $employee->id }}">
                                                 {{ $employee->first_name }} {{ $employee->last_name }}
                                             </option>
+                                        @endforeach
+                                    </select> --}}
+                                    <select class="form-select" wire:model="splitEntries.{{ $index }}.employee_id">
+                                        <option value="">Select Employee</option>
+                                        @foreach($external_employees as $employee)
+                                            @php
+                                                $pending = $pendingOrdersPerEmployee[$employee->id] ?? 0;
+
+                                                // Check if employee is already selected in another split entry
+                                                $isAlreadySelected = collect($splitEntries)
+                                                    ->where('employee_id', $employee->id)
+                                                    ->keys()
+                                                    ->filter(fn($i) => $i !== $index) // exclude current index
+                                                    ->isNotEmpty();
+                                            @endphp
+
+                                            @if(!$isAlreadySelected)
+                                                <option value="{{ $employee->id }}">
+                                                    {{ $employee->first_name }} {{ $employee->last_name }}
+                                                    @if($pending > 0)
+                                                        (Pending Orders: {{ $pending }})
+                                                    @endif
+                                                </option>
+                                            @endif
                                         @endforeach
                                     </select>
                                 </div>
