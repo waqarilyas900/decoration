@@ -1,4 +1,6 @@
 <div class="container-fluid p-0">
+   
+
     <div class="row">
         <div class="col-md-10 m-auto col-12">
             @if (session()->has('message'))
@@ -7,6 +9,16 @@
             </div>
             @endif
             <div class="card">
+                 @if ($errors->any())
+                    <div class="mb-4 p-4 rounded-lg bg-red-100 border border-red-400 text-red-700">
+                        <strong>Whoops! Something went wrong.</strong>
+                        <ul class="mt-2 list-disc list-inside text-sm">
+                            @foreach ($errors->all() as $error)
+                                <li>{{ $error }}</li>
+                            @endforeach
+                        </ul>
+                    </div>
+                @endif
                 <div class="card body p-4">
                     <form wire:submit.prevent="save">
 
@@ -155,7 +167,7 @@
                                             </option>
                                         @endforeach
                                     </select> --}}
-                                    <select class="form-select" wire:model="splitEntries.{{ $index }}.employee_id">
+                                    {{-- <select class="form-select" wire:model="splitEntries.{{ $index }}.employee_id">
                                         <option value="">Select Employee</option>
                                         @foreach($external_employees as $employee)
                                             @php
@@ -168,7 +180,32 @@
                                                 @endif
                                             </option>
                                         @endforeach
+                                    </select> --}}
+                                    <select class="form-select" wire:model="splitEntries.{{ $index }}.employee_id">
+                                        <option value="">Select Employee</option>
+                                        @foreach($external_employees as $employee)
+                                            @php
+                                                $pending = $pendingOrdersPerEmployee[$employee->id] ?? 0;
+
+                                                // Check if employee is already selected in another split entry
+                                                $isAlreadySelected = collect($splitEntries)
+                                                    ->where('employee_id', $employee->id)
+                                                    ->keys()
+                                                    ->filter(fn($i) => $i !== $index) // exclude current index
+                                                    ->isNotEmpty();
+                                            @endphp
+
+                                            @if(!$isAlreadySelected)
+                                                <option value="{{ $employee->id }}">
+                                                    {{ $employee->first_name }} {{ $employee->last_name }}
+                                                    @if($pending > 0)
+                                                        (Pending Orders: {{ $pending }})
+                                                    @endif
+                                                </option>
+                                            @endif
+                                        @endforeach
                                     </select>
+
 
 
                                 </div>

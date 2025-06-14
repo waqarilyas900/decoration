@@ -62,9 +62,165 @@ class ExternalPendingOrderComponent extends Component
 
     }
 
+    // public function orders()
+    // {
+
+    //     $user = auth()->user();
+    //     $employeeId = $user->employee_id ?? null;
+
+    //     $query = Order::query()
+    //         ->where('status', 0)
+    //         ->with(['assignments' => fn($q) => $q->where('employee_id', $employeeId)]);
+
+    //     // 🔒 Restrict to relevant orders
+    //     if ($user->type == 2 && $employeeId) {
+
+    //         $myAssignments = OrderAssignment::where('employee_id', $employeeId)->get();
+
+    //         $query->whereHas('assignments', fn($q) => $q->where('employee_id', $employeeId))
+    //             ->where(function ($q) use ($myAssignments) {
+    //                 foreach ($myAssignments as $assign) {
+    //                     $q->orWhere(function ($sub) use ($assign) {
+    //                         // $dependsOn = $this->getPreviousSection($assign->section);
+    //                         $dependsOn = $this->getPreviousSection($assign->section, $assign->order);
+
+    //                         if (!$dependsOn) {
+    //                             $sub->where('id', $assign->order_id);
+    //                         } else {
+    //                             $sub->where('id', $assign->order_id)
+    //                                 ->whereHas('assignments', fn($qa) =>
+    //                                     $qa->where('section', $dependsOn)
+    //                                     ->where('garments_assigned', $assign->garments_assigned)
+    //                                     ->where('is_complete', 1)
+    //                                 );
+    //                         }
+    //                     });
+    //                 }
+    //             });
+    //     }
+
+    //     // 📊 Filters
+    //     if ($this->sort) {
+    //         $query->orderBy($this->sort, $this->orderBy ?? 'asc');
+    //     } else {
+    //         $query->orderByDesc('is_priority')->orderBy('created_at', 'asc');
+    //     }
+
+    //     if ($this->location) {
+    //         $query->where('current_location', $this->location);
+    //     }
+
+    //     if (strlen($this->search) > 3) {
+    //         $query->searchLike(['order_number', 'current_location'], $this->search);
+    //     }
+
+    //     $orders = $query->get();
+
+    //     // ✅ ETA Calculation
+    //     if ($user->type == 2 && $employeeId) {
+
+    //         $employee = $user->employee;
+    //         $startHour = Carbon::createFromFormat('H:i:s', $employee->working_hours_start);
+    //         $endHour = Carbon::createFromFormat('H:i:s', $employee->working_hours_end);
+    //         $dailySeconds = $endHour->diffInSeconds($startHour);
+    //         $timePerGarment = CarbonInterval::createFromFormat('H:i:s', $employee->time_per_garment);
+
+    //         $cursorTime = $this->normalizeStartTime(Carbon::now(), $startHour, $endHour);
+
+    //         $completedAssignments = OrderAssignment::where('is_complete', 1)->get()
+    //             ->groupBy(fn($a) => "{$a->order_id}|{$a->section}|{$a->garments_assigned}");
+
+    //         foreach ($orders as $order) {
+    //             $assignments = $order->assignments
+    //                 ->where('employee_id', $employeeId)
+    //                 ->sortBy(fn($a) => $this->getSectionPriority($a->section));
+
+    //             foreach ($assignments as $assignment) {
+    //                 if ($assignment->is_complete) continue;
+
+    //                 $dependsOn = $this->getPreviousEmployeeSection($order, $employeeId, $assignment->section, $assignment->garments_assigned);
+    //                 if ($dependsOn) {
+    //                     $key = "{$order->id}|{$dependsOn}|{$assignment->garments_assigned}";
+    //                     if (!$completedAssignments->has($key)) continue;
+    //                 }
+
+    //                 $eta = $cursorTime->copy();
+    //                 $totalSeconds = $timePerGarment->totalSeconds * $assignment->garments_assigned;
+
+    //                 $eta = $this->normalizeStartTime($eta, $startHour, $endHour);
+
+    //                 $secondsLeft = $totalSeconds;
+    //                 while ($secondsLeft > 0) {
+    //                     if ($this->isWeekend($eta)) {
+    //                         $eta->addDay()->setTimeFrom($startHour);
+    //                         continue;
+    //                     }
+
+    //                     $endOfDay = $eta->copy()->setTimeFrom($endHour);
+    //                     $available = $eta->diffInSeconds($endOfDay);
+    //                     $consume = min($available, $secondsLeft);
+
+    //                     $eta->addSeconds($consume);
+    //                     $secondsLeft -= $consume;
+
+    //                     if ($secondsLeft > 0) {
+    //                         $eta->addDay()->setTimeFrom($startHour);
+    //                         while ($this->isWeekend($eta)) {
+    //                             $eta->addDay();
+    //                         }
+    //                     }
+    //                 }
+
+    //                 // Set ETA for the order
+    //                 $order->eta_data = [
+    //                     'section' => $assignment->section,
+    //                     'garments' => $assignment->garments_assigned,
+    //                     'total_time' => gmdate('H:i:s', $totalSeconds),
+    //                     'expected_delivery' => $eta->toDateTimeString(),
+    //                 ];
+
+    //                 // Move cursor forward
+    //                 $cursorTime = $eta->copy();
+
+    //                 break; // only first valid assignment per order
+    //             }
+    //         }
+
+    //     }
+
+    //     // 📦 Paginate manually after enrichment
+    //     $page = request()->get('page', 1);
+    //     $perPage = 20;
+    //     return new \Illuminate\Pagination\LengthAwarePaginator(
+    //         $orders->forPage($page, $perPage),
+    //         $orders->count(),
+    //         $perPage,
+    //         $page,
+    //         ['path' => request()->url(), 'query' => request()->query()]
+    //     );
+    // }
+    // private function getPreviousSection($section, Order $order)
+    // {
+    //     $sections = ['Sewing', 'Embroidery', 'Imprinting'];
+
+    //     $currentIndex = array_search($section, $sections);
+
+    //     if ($currentIndex === false || $currentIndex === 0) {
+    //         return null;
+    //     }
+
+    //     // Walk backward to find previous required stage
+    //     for ($i = $currentIndex - 1; $i >= 0; $i--) {
+    //         $prev = $sections[$i];
+    //         if ($order->{'need_' . strtolower($prev)}) {
+    //             return $prev;
+    //         }
+    //     }
+
+    //     return null;
+    // }
     public function orders()
     {
-
         $user = auth()->user();
         $employeeId = $user->employee_id ?? null;
 
@@ -72,25 +228,38 @@ class ExternalPendingOrderComponent extends Component
             ->where('status', 0)
             ->with(['assignments' => fn($q) => $q->where('employee_id', $employeeId)]);
 
-        // 🔒 Restrict to relevant orders
         if ($user->type == 2 && $employeeId) {
-
+            // Get all assignments for current employee
             $myAssignments = OrderAssignment::where('employee_id', $employeeId)->get();
 
             $query->whereHas('assignments', fn($q) => $q->where('employee_id', $employeeId))
                 ->where(function ($q) use ($myAssignments) {
                     foreach ($myAssignments as $assign) {
-                        $q->orWhere(function ($sub) use ($assign) {
-                            $dependsOn = $this->getPreviousSection($assign->section);
-                            if (!$dependsOn) {
+                        $order = Order::find($assign->order_id);
+                        if (!$order) continue;
+
+                        $q->orWhere(function ($sub) use ($assign, $order) {
+                            $prevSection = $this->getPreviousSection($assign->section, $order);
+
+                            if (!$prevSection) {
+                                // No dependency, allow this assignment
                                 $sub->where('id', $assign->order_id);
                             } else {
-                                $sub->where('id', $assign->order_id)
-                                    ->whereHas('assignments', fn($qa) =>
-                                        $qa->where('section', $dependsOn)
-                                        ->where('garments_assigned', $assign->garments_assigned)
-                                        ->where('is_complete', 1)
-                                    );
+                                // Check matching previous assignment is completed
+                                $currentAssignments = $this->getSectionAssignments($order, $assign->section);
+                                $prevAssignments = $this->getSectionAssignments($order, $prevSection);
+
+                                $index = $currentAssignments->search(fn($a) => $a->id === $assign->id);
+
+                                if ($index !== false && isset($prevAssignments[$index])) {
+                                    $prev = $prevAssignments[$index];
+                                    if (
+                                        $prev->is_complete &&
+                                        $prev->garments_assigned === $assign->garments_assigned
+                                    ) {
+                                        $sub->where('id', $assign->order_id);
+                                    }
+                                }
                             }
                         });
                     }
@@ -116,17 +285,11 @@ class ExternalPendingOrderComponent extends Component
 
         // ✅ ETA Calculation
         if ($user->type == 2 && $employeeId) {
-
             $employee = $user->employee;
             $startHour = Carbon::createFromFormat('H:i:s', $employee->working_hours_start);
             $endHour = Carbon::createFromFormat('H:i:s', $employee->working_hours_end);
-            $dailySeconds = $endHour->diffInSeconds($startHour);
             $timePerGarment = CarbonInterval::createFromFormat('H:i:s', $employee->time_per_garment);
-
             $cursorTime = $this->normalizeStartTime(Carbon::now(), $startHour, $endHour);
-
-            $completedAssignments = OrderAssignment::where('is_complete', 1)->get()
-                ->groupBy(fn($a) => "{$a->order_id}|{$a->section}|{$a->garments_assigned}");
 
             foreach ($orders as $order) {
                 $assignments = $order->assignments
@@ -136,15 +299,12 @@ class ExternalPendingOrderComponent extends Component
                 foreach ($assignments as $assignment) {
                     if ($assignment->is_complete) continue;
 
-                    $dependsOn = $this->getPreviousEmployeeSection($order, $employeeId, $assignment->section, $assignment->garments_assigned);
-                    if ($dependsOn) {
-                        $key = "{$order->id}|{$dependsOn}|{$assignment->garments_assigned}";
-                        if (!$completedAssignments->has($key)) continue;
+                    if (!$this->hasCorrectSequentialDependency($order, $assignment)) {
+                        continue;
                     }
 
                     $eta = $cursorTime->copy();
                     $totalSeconds = $timePerGarment->totalSeconds * $assignment->garments_assigned;
-
                     $eta = $this->normalizeStartTime($eta, $startHour, $endHour);
 
                     $secondsLeft = $totalSeconds;
@@ -169,7 +329,6 @@ class ExternalPendingOrderComponent extends Component
                         }
                     }
 
-                    // Set ETA for the order
                     $order->eta_data = [
                         'section' => $assignment->section,
                         'garments' => $assignment->garments_assigned,
@@ -177,18 +336,16 @@ class ExternalPendingOrderComponent extends Component
                         'expected_delivery' => $eta->toDateTimeString(),
                     ];
 
-                    // Move cursor forward
                     $cursorTime = $eta->copy();
-
-                    break; // only first valid assignment per order
+                    break;
                 }
             }
-
         }
 
-        // 📦 Paginate manually after enrichment
+        // 📦 Manual Pagination
         $page = request()->get('page', 1);
         $perPage = 20;
+
         return new \Illuminate\Pagination\LengthAwarePaginator(
             $orders->forPage($page, $perPage),
             $orders->count(),
@@ -197,6 +354,53 @@ class ExternalPendingOrderComponent extends Component
             ['path' => request()->url(), 'query' => request()->query()]
         );
     }
+
+
+private function getPreviousSection($section, Order $order)
+{
+    $sections = ['Sewing', 'Embroidery', 'Imprinting'];
+    $currentIndex = array_search($section, $sections);
+
+    if ($currentIndex === false || $currentIndex === 0) {
+        return null;
+    }
+
+    for ($i = $currentIndex - 1; $i >= 0; $i--) {
+        $prev = $sections[$i];
+        if ($order->{'need_' . strtolower($prev)}) {
+            return $prev;
+        }
+    }
+
+    return null;
+}
+
+private function getSectionAssignments(Order $order, string $section)
+{
+    return OrderAssignment::where('order_id', $order->id)
+        ->where('section', $section)
+        ->orderBy('id') // Ensure consistent order
+        ->get();
+}
+private function hasCorrectSequentialDependency(Order $order, $assignment)
+{
+    $prevSection = $this->getPreviousSection($assignment->section, $order);
+    if (!$prevSection) return true;
+
+    $currentAssignments = $this->getSectionAssignments($order, $assignment->section);
+    $prevAssignments = $this->getSectionAssignments($order, $prevSection);
+
+    $index = $currentAssignments->search(fn($a) => $a->id === $assignment->id);
+
+    if ($index === false || !isset($prevAssignments[$index])) {
+        return false;
+    }
+
+    $prev = $prevAssignments[$index];
+
+    return $prev->is_complete && $prev->garments_assigned === $assignment->garments_assigned;
+}
+
 
     private function normalizeStartTime(Carbon $time, Carbon $start, Carbon $end): Carbon
     {
@@ -219,6 +423,8 @@ class ExternalPendingOrderComponent extends Component
         $this->confirmingType = $type;
         $this->confirmingStageUpdate = true;
     }
+  
+
     public function performStageUpdate()
     {
         $orderId = $this->confirmingOrderId;
@@ -237,21 +443,60 @@ class ExternalPendingOrderComponent extends Component
             return;
         }
 
+        $progressChanged = false;
+        $completionChanged = false;
+
         foreach ($assignments as $assignment) {
             if ($type === 'progress') {
                 $assignment->is_progress = !$assignment->is_progress;
-                if (!$assignment->is_progress) {
-                    $assignment->is_complete = 0;
+
+                if ($assignment->is_progress) {
+                    $progressChanged = true;
+                } else {
+                    $assignment->is_complete = 0; // reset complete if progress turned off
                 }
             } elseif ($type === 'complete' && $assignment->is_progress) {
                 $assignment->is_complete = !$assignment->is_complete;
+                $completionChanged = true;
             }
+
             $assignment->save();
+        }
+
+        $order = Order::find($orderId);
+
+        // ✅ If marked progress, update progress field to 2
+        if ($progressChanged && $order) {
+            $progressField = strtolower($stage) . '_progress';
+            if (in_array($progressField, ['sewing_progress', 'embroidery_progress', 'imprinting_progress'])) {
+                $order->$progressField = 1;
+            }
+        }
+
+        // ✅ If marked complete, check if all are complete for this section
+        if ($completionChanged && $order) {
+            $allComplete = OrderAssignment::where('order_id', $orderId)
+                ->where('section', $stage)
+                ->where('is_complete', 0)
+                ->doesntExist(); // No incomplete = all complete
+
+            if ($allComplete) {
+                $needField = 'need_' . strtolower($stage);
+                if (in_array($needField, ['need_sewing', 'need_embroidery', 'need_imprinting'])) {
+                    $order->$needField = 1;
+                }
+            }
+        }
+
+        if (isset($order)) {
+            $order->save();
         }
 
         $this->confirmingStageUpdate = false;
         $this->checkAndAdvanceOrderStage($orderId);
     }
+
+
     public function checkAndAdvanceOrderStage($orderId)
     {
         $stages = ['Sewing', 'Embroidery', 'Imprinting'];
@@ -309,14 +554,16 @@ class ExternalPendingOrderComponent extends Component
         };
     }
 
-    private function getPreviousSection($section)
-    {
-        return match ($section) {
-            'Embroidery' => 'Sewing',
-            'Imprinting' => 'Embroidery',
-            default => null,
-        };
-    }
+    // private function getPreviousSection($section)
+    // {
+    //     return match ($section) {
+    //         'Embroidery' => 'Sewing',
+    //         'Imprinting' => 'Embroidery',
+    //         default => null,
+    //     };
+    // }
+   
+
     private function getPreviousEmployeeSection(Order $order, $employeeId, $currentSection, $garments)
     {
         $sections = ['Sewing', 'Embroidery', 'Imprinting'];

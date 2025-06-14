@@ -52,11 +52,11 @@
                                     <th class="text-uppercase text-secondary text-xxs font-weight-bolder opacity-7 text-center">
                                         Imprinting
                                     </th>
-                                    <th class="text-uppercase text-secondary text-xxs font-weight-bolder opacity-7 text-center">
+                                    {{-- <th class="text-uppercase text-secondary text-xxs font-weight-bolder opacity-7 text-center">
                                         ETA
-                                    </th>
+                                    </th> --}}
                                      <th class="text-uppercase text-secondary text-xxs font-weight-bolder opacity-7 text-center">
-                                        Expected Delivery Date/Time
+                                        Expected Delivery Date
                                     </th>
                                     <th class="text-uppercase text-secondary text-xxs font-weight-bolder opacity-7">Action</th>
                                 </tr>
@@ -145,30 +145,25 @@
                                                 </div>
                                             </div>
                                         </td>
-                                      
                                            <!-- ETA Info -->
-<td>
-    @if(!empty($order->eta_data))
-        <strong>{{ $order->eta_data['section'] }} ETA:</strong>
-        {{ $order->eta_data['total_time'] }}
-    @else
-        <span class="text-muted">—</span>
-    @endif
-</td>
+                                            {{-- <td>
+                                                @if(!empty($order->eta_data))
+                                                    <strong>{{ $order->eta_data['section'] }} ETA:</strong>
+                                                    {{ $order->eta_data['total_time'] }}
+                                                @else
+                                                    <span class="text-muted">—</span>
+                                                @endif
+                                            </td> --}}
 
-<!-- Delivery Date/Time -->
-<td>
-    @if(!empty($order->eta_data))
-        <strong>{{ $order->eta_data['section'] }} Delivery:</strong>
-        {{ \Carbon\Carbon::parse($order->eta_data['expected_delivery'])->format('d M Y, h:i A') }}
-    @else
-        <span class="text-muted">—</span>
-    @endif
-</td>
-
-
-
-
+                                            <!-- Delivery Date/Time -->
+                                            <td>
+                                                @if(!empty($order->eta_data))
+                                                    <strong>{{ $order->eta_data['section'] }} Delivery:</strong>
+                                                    {{ \Carbon\Carbon::parse($order->eta_data['expected_delivery'])->format('M d Y') }}
+                                                @else
+                                                    <span class="text-muted">—</span>
+                                                @endif
+                                            </td>
                                         <!-- View Button -->
                                         <td class="align-middle text-center text-sm">
                                             <a href="{{ route('edit.orders.external', ['orderId' => $order->id]) }}">

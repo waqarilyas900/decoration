@@ -84,6 +84,27 @@ class Create extends Component
         }
 
         $validated = $this->validate();
+        $requiredSections = collect([
+                'Sewing' => $this->need_sewing,
+                'Embroidery' => $this->need_embroidery,
+                'Imprinting' => $this->need_imprinting,
+            ])->filter();
+
+            foreach ($requiredSections as $section => $required) {
+                $entries = $this->allSplitEntries[$section] ?? [];
+
+                if (empty($entries)) {
+                    $this->addError('splitEntries', "Please assign employees for {$section} section.");
+                    return;
+                }
+
+                foreach ($entries as $entry) {
+                    if (empty($entry['employee_id']) || empty($entry['quantity']) || $entry['quantity'] <= 0) {
+                        $this->addError('splitEntries', "Each {$section} assignment must have a valid employee and quantity.");
+                        return;
+                    }
+                }
+            }
 
         $order = Order::forceCreate($validated);
 
@@ -146,6 +167,7 @@ class Create extends Component
 
     public function openSplitModal($section)
     {
+         $this->resetErrorBag();
         $this->splitSection = $section;
 
         // Load pending order counts per employee for the current section
@@ -214,7 +236,10 @@ class Create extends Component
     public function saveSplitAssignments()
     {
         $totalAssigned = collect($this->splitEntries)->sum(fn($entry) => (int) $entry['quantity']);
-
+        if ($totalAssigned !== (int) $this->number_of_garments) {
+            $this->addError('splitEntries', 'Total assigned garments must exactly match the number of garments specified ('.$this->number_of_garments.').');
+            return;
+        }
         if ($totalAssigned > $this->number_of_garments) {
             $this->addError('splitEntries', 'Total assigned garments exceed the number of garments specified.');
             return;
@@ -227,10 +252,10 @@ class Create extends Component
             }
         }
         $quantities = collect($this->splitEntries)->pluck('quantity')->map(fn($q) => (int) $q)->toArray();
-        if (count($quantities) > 1 && count(array_unique($quantities)) === 1) {
-            $this->addError('splitEntries', 'Split quantities must not be equally divided.');
-            return;
-        }
+        // if (count($quantities) > 1 && count(array_unique($quantities)) === 1) {
+        //     $this->addError('splitEntries', 'Split quantities must not be equally divided.');
+        //     return;
+        // }
         // Set pattern only once (first section)
         if (!$this->splitQuantitiesPattern) {
             $this->splitQuantitiesPattern = collect($this->splitEntries)

@@ -19,4 +19,14 @@ class OrderAssignmentLog extends Model
         'garments_assigned',
         'status',
     ];
+
+     public function order()
+    {
+        return $this->belongsTo(Order::class);
+    }
+    public function employee()
+    {
+        return $this->belongsTo(Employee::class, 'employee_id');
+    }
+
 }

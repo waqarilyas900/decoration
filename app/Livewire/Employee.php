@@ -24,7 +24,7 @@ class Employee extends Component
     public function getEmployees()
     {
         $queyr = ModelsEmployee::where('is_delete', 0)->where('type', 1);
-        if (strlen($this->search) > 3) {
+        if (strlen($this->search) > 2) {
             $search = $this->search;
             $columns = ['first_name', 'last_name', 'email'];
             $queyr->searchLike($columns, $search);
@@ -50,9 +50,9 @@ class Employee extends Component
     }
     public function save()
     {
+        $this->record->type = 1; 
         $this->validate();
-
-        $this->record->type = 1; // Ensure type is always 1 (internal)
+       
 
         $message = $this->record->id ? 'updated' : 'created';
 

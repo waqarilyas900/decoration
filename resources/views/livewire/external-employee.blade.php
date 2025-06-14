@@ -46,10 +46,7 @@
                                                 class="text-uppercase text-secondary text-xxs font-weight-bolder opacity-7">
                                                 Last Name
                                             </th>
-                                            <th
-                                                class="text-uppercase text-secondary text-xxs font-weight-bolder opacity-7">
-                                                Email
-                                            </th>
+                                           
 
                                             <th
                                                 class="text-uppercase text-secondary text-xxs font-weight-bolder opacity-7">
@@ -68,9 +65,7 @@
                                             <td>
                                                 {{ $item->last_name }}
                                             </td>
-                                            <td>
-                                                {{ $item->email }}
-                                            </td>
+                                           
                                             <td>
                                                 <button wire:click="edit({{ $item->id }})" class="btn btn-info"><i
                                                         class="fa fa-pencil"></i></button>
@@ -127,18 +122,37 @@
                             </div>
 
                             <!-- PIN -->
-                            <div class="col-md-6">
+                           <div class="col-md-6">
                                 <div class="mb-0">
-                                    <label for="pin" class="form-label h5">PIN</label>
-                                    <input type="password" class="form-control" id="pin" aria-describedby="pin" wire:model="record.pin">
+                                    <label for="user_password" class="form-label h5">PIN</label>
+                                    <input type="password" id="user_password" class="form-control" wire:model="user_password" placeholder="Enter password">
                                     <div class="form-text text-danger mb-4">
-                                        @error('record.pin')
-                                            <b>{{ $message }}</b>
-                                        @enderror
+                                        @error('user_password') <b>{{ $message }}</b> @enderror
                                     </div>
                                 </div>
                             </div>
 
+
+                            <!-- Time per Garment -->
+                            <div class="col-md-6">
+                                <div class="mb-0">
+                                    <label class="form-label h5">TIME PER GARMENT</label>
+                                    <div class="d-flex gap-2 align-items-center">
+                                        <input type="number"  class="form-control" style="width: 100px;"
+                                            placeholder="Hours" wire:model="time_per_garment_hours">
+
+                                        <span class="h5 m-0">:</span>
+
+                                        <input type="number"  class="form-control" style="width: 100px;"
+                                            placeholder="Minutes" wire:model="time_per_garment_minutes">
+                                    </div>
+
+                                    <div class="form-text text-danger mb-4">
+                                        @error('time_per_garment_hours') <b>{{ $message }}</b> @enderror
+                                        @error('time_per_garment_minutes') <b>{{ $message }}</b> @enderror
+                                    </div>
+                                </div>
+                            </div>
                             <!-- Working Hours Start -->
                             <div class="col-md-6">
                                 <div class="mb-0">
@@ -165,26 +179,7 @@
                                 </div>
                             </div>
 
-                            <!-- Time per Garment -->
-                            <div class="col-md-6">
-                                <div class="mb-0">
-                                    <label class="form-label h5">TIME PER GARMENT</label>
-                                    <div class="d-flex gap-2 align-items-center">
-                                        <input type="number" min="0" class="form-control" style="width: 100px;"
-                                            placeholder="Hours" wire:model="time_per_garment_hours">
-
-                                        <span class="h5 m-0">:</span>
-
-                                        <input type="number" min="0" max="59" class="form-control" style="width: 100px;"
-                                            placeholder="Minutes" wire:model="time_per_garment_minutes">
-                                    </div>
-
-                                    <div class="form-text text-danger mb-4">
-                                        @error('time_per_garment_hours') <b>{{ $message }}</b> @enderror
-                                        @error('time_per_garment_minutes') <b>{{ $message }}</b> @enderror
-                                    </div>
-                                </div>
-                            </div>
+                           
 
 
                         </div>

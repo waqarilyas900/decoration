@@ -92,39 +92,58 @@
 
                                 </div>
                             </div>
+                            @php
+                            $employeeId = auth()->user()->employee_id;
+                        @endphp
+
                             <div class="col-md-6 mt-4">
                                 <div class="row">
                                     <div class="col-md-12">
-                                        <div class="form-check mb-3 d-flex align-item-center gap-3">
-                                            <input class="" type="checkbox" id="fcustomCheck11"
-                                                wire:model.live="need_sewing">
-                                            <label class="custom-control-label h4 m-0" for="fcustomCheck11">Needs
-                                                Sewing</label>
-                                                 @if( $need_sewing)
-                                        <button type="button" class="btn btn-sm btn-outline-primary ms-2"
-                                                wire:click="openSplitModal('Sewing')">Assigned</button>
-                                    @endif
-                                        </div>
-                                        <div class="form-check mb-3 d-flex align-item-center gap-3">
-                                            <input class="" type="checkbox" id="fcustomCheck12"
-                                                wire:model.live="need_embroidery">
-                                            <label class="custom-control-label h4 m-0" for="fcustomCheck12">Needs
-                                                Embroidery</label>
-                                                  @if( $need_embroidery)
-                                        <button type="button" class="btn btn-sm btn-outline-primary ms-2"
-                                                wire:click="openSplitModal('Embroidery')">Assigned</button>
-                                    @endif
-                                        </div>
-                                        <div class="form-check mb-3 d-flex align-item-center gap-3">
-                                            <input class="" type="checkbox" id="fcustomCheck3"
-                                                wire:model.live="need_imprinting">
-                                            <label class="custom-control-label h4 m-0" for="fcustomCheck3"> Needs
-                                                Imprinting</label>
-                                                 @if( $need_imprinting)
-                                        <button type="button" class="btn btn-sm btn-outline-primary ms-2"
-                                                wire:click="openSplitModal('Imprinting')">Assigned</button>
-                                    @endif
-                                        </div>
+                                       <div class="form-check mb-3 d-flex align-item-center gap-3">
+    <input class="" type="checkbox" id="fcustomCheck11" wire:model.live="need_sewing" disabled>
+    <label class="custom-control-label h4 m-0" for="fcustomCheck11">Needs Sewing</label>
+    @if($need_sewing && isset($allSplitEntries['Sewing']))
+        @php
+            $sewingQty = collect($allSplitEntries['Sewing'])
+                            ->where('employee_id', $employeeId)
+                            ->sum('quantity');
+        @endphp
+        @if($sewingQty > 0)
+            <span class="ms-2 fw-bold text-dark">(Qty: {{ $sewingQty }})</span>
+        @endif
+    @endif
+</div>
+
+                                       <div class="form-check mb-3 d-flex align-item-center gap-3">
+    <input class="" type="checkbox" id="fcustomCheck12" wire:model.live="need_embroidery" disabled>
+    <label class="custom-control-label h4 m-0" for="fcustomCheck12">Needs Embroidery</label>
+    @if($need_embroidery && isset($allSplitEntries['Embroidery']))
+        @php
+            $embQty = collect($allSplitEntries['Embroidery'])
+                            ->where('employee_id', $employeeId)
+                            ->sum('quantity');
+        @endphp
+        @if($embQty > 0)
+            <span class="ms-2 fw-bold text-dark">(Qty: {{ $embQty }})</span>
+        @endif
+    @endif
+</div>
+
+                                       <div class="form-check mb-3 d-flex align-item-center gap-3">
+    <input class="" type="checkbox" id="fcustomCheck3" wire:model.live="need_imprinting" disabled>
+    <label class="custom-control-label h4 m-0" for="fcustomCheck3">Needs Imprinting</label>
+    @if($need_imprinting && isset($allSplitEntries['Imprinting']))
+        @php
+            $impQty = collect($allSplitEntries['Imprinting'])
+                            ->where('employee_id', $employeeId)
+                            ->sum('quantity');
+        @endphp
+        @if($impQty > 0)
+            <span class="ms-2 fw-bold text-dark">(Qty: {{ $impQty }})</span>
+        @endif
+    @endif
+</div>
+
                                     </div>
                                     <div class="col-md-12 mt-3">
                                         <div class="table-responsive p-0">
