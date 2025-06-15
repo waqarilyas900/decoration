@@ -355,51 +355,50 @@ class ExternalPendingOrderComponent extends Component
         );
     }
 
+    private function getPreviousSection($section, Order $order)
+    {
+        $sections = ['Sewing', 'Embroidery', 'Imprinting'];
+        $currentIndex = array_search($section, $sections);
 
-private function getPreviousSection($section, Order $order)
-{
-    $sections = ['Sewing', 'Embroidery', 'Imprinting'];
-    $currentIndex = array_search($section, $sections);
+        if ($currentIndex === false || $currentIndex === 0) {
+            return null;
+        }
 
-    if ($currentIndex === false || $currentIndex === 0) {
+        for ($i = $currentIndex - 1; $i >= 0; $i--) {
+            $prev = $sections[$i];
+            if ($order->{'need_' . strtolower($prev)}) {
+                return $prev;
+            }
+        }
+
         return null;
     }
 
-    for ($i = $currentIndex - 1; $i >= 0; $i--) {
-        $prev = $sections[$i];
-        if ($order->{'need_' . strtolower($prev)}) {
-            return $prev;
+    private function getSectionAssignments(Order $order, string $section)
+    {
+        return OrderAssignment::where('order_id', $order->id)
+            ->where('section', $section)
+            ->orderBy('id') // Ensure consistent order
+            ->get();
+    }
+    private function hasCorrectSequentialDependency(Order $order, $assignment)
+    {
+        $prevSection = $this->getPreviousSection($assignment->section, $order);
+        if (!$prevSection) return true;
+
+        $currentAssignments = $this->getSectionAssignments($order, $assignment->section);
+        $prevAssignments = $this->getSectionAssignments($order, $prevSection);
+
+        $index = $currentAssignments->search(fn($a) => $a->id === $assignment->id);
+
+        if ($index === false || !isset($prevAssignments[$index])) {
+            return false;
         }
+
+        $prev = $prevAssignments[$index];
+
+        return $prev->is_complete && $prev->garments_assigned === $assignment->garments_assigned;
     }
-
-    return null;
-}
-
-private function getSectionAssignments(Order $order, string $section)
-{
-    return OrderAssignment::where('order_id', $order->id)
-        ->where('section', $section)
-        ->orderBy('id') // Ensure consistent order
-        ->get();
-}
-private function hasCorrectSequentialDependency(Order $order, $assignment)
-{
-    $prevSection = $this->getPreviousSection($assignment->section, $order);
-    if (!$prevSection) return true;
-
-    $currentAssignments = $this->getSectionAssignments($order, $assignment->section);
-    $prevAssignments = $this->getSectionAssignments($order, $prevSection);
-
-    $index = $currentAssignments->search(fn($a) => $a->id === $assignment->id);
-
-    if ($index === false || !isset($prevAssignments[$index])) {
-        return false;
-    }
-
-    $prev = $prevAssignments[$index];
-
-    return $prev->is_complete && $prev->garments_assigned === $assignment->garments_assigned;
-}
 
 
     private function normalizeStartTime(Carbon $time, Carbon $start, Carbon $end): Carbon
@@ -494,6 +493,7 @@ private function hasCorrectSequentialDependency(Order $order, $assignment)
 
         $this->confirmingStageUpdate = false;
         $this->checkAndAdvanceOrderStage($orderId);
+        $this->checkAndMarkOrderReady($orderId);
     }
 
 
@@ -528,6 +528,35 @@ private function hasCorrectSequentialDependency(Order $order, $assignment)
 
         $order->save();
     }
+    public function checkAndMarkOrderReady($orderId)
+    {
+        $order = \App\Models\Order::find($orderId);
+
+        if (!$order) return;
+
+        $sections = ['Sewing', 'Embroidery', 'Imprinting'];
+
+        foreach ($sections as $section) {
+            $needField = 'need_' . $section;
+
+            if ($order->$needField) {
+                $incompleteExists = \App\Models\OrderAssignment::where('order_id', $order->id)
+                    ->where('section', ucfirst($section)) // capitalize to match DB
+                    ->where('is_complete', 0)
+                    ->exists();
+
+                if ($incompleteExists) {
+                    // ❌ One assignment in this section is not complete
+                    return;
+                }
+            }
+        }
+
+        // ✅ All required sections completed
+        $order->status = 1;
+        $order->save();
+    }
+
     public function sortData($sort, $orderBy)
     {
         $this->orderBy = $orderBy;
