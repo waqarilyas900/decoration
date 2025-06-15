@@ -96,7 +96,7 @@
              @php
                  $firstName = auth()->user()->name;
              @endphp
-               <a class="nav-link  {{ \Request::route()->getName() == 'pending.orders.external' ? 'active' : '' }}"
+               <a class="nav-link  {{ \Request::route()->getName() == 'home' ? 'active' : '' }}"
                     href="{{ route('home') }}">
                     <div
                         class="icon icon-shape icon-sm shadow border-radius-md  text-center me-2 d-flex align-items-center justify-content-center">
@@ -106,7 +106,7 @@
 
                     </div>
                     <span
-                        class="nav-link-text ms-1 h5 mb-0 {{ \Request::route()->getName() == 'pending.orders.external' ? 'text-primary' : '' }}">
+                        class="nav-link-text ms-1 h5 mb-0 {{ \Request::route()->getName() == 'home' ? 'text-primary' : '' }}">
                         {{ $firstName }}</span>
                 </a>
             </li>
