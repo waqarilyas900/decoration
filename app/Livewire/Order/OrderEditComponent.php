@@ -325,7 +325,7 @@ class OrderEditComponent extends Component
     {
         $this->resetErrorBag();
         $this->splitSection = $section;
-
+        $this->pendingOrdersPerEmployee = $this->getPendingOrdersCountPerEmployee($section);
         // If already exists, use it
         if (isset($this->allSplitEntries[$section])) {
             $this->splitEntries = $this->allSplitEntries[$section];

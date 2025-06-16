@@ -423,6 +423,76 @@ class ExternalPendingOrderComponent extends Component
         $this->confirmingStageUpdate = true;
     }
   
+    // public function performStageUpdate()
+    // {
+    //     $orderId = $this->confirmingOrderId;
+    //     $stage = $this->confirmingStage;
+    //     $type = $this->confirmingType;
+
+    //     $user = auth()->user();
+    //     $employeeId = $user->employee_id;
+
+    //     $assignments = OrderAssignment::where('order_id', $orderId)
+    //         ->where('section', $stage)
+    //         ->where('employee_id', $employeeId)
+    //         ->get();
+
+    //     if ($assignments->isEmpty()) {
+    //         return;
+    //     }
+
+    //     $progressChanged = false;
+    //     $completionChanged = false;
+
+    //     foreach ($assignments as $assignment) {
+    //         if ($type === 'progress') {
+    //             $assignment->is_progress = !$assignment->is_progress;
+
+    //             if ($assignment->is_progress) {
+    //                 $progressChanged = true;
+    //             } else {
+    //                 $assignment->is_complete = 0; // reset complete if progress turned off
+    //             }
+    //         } elseif ($type === 'complete' && $assignment->is_progress) {
+    //             $assignment->is_complete = !$assignment->is_complete;
+    //             $completionChanged = true;
+    //         }
+
+    //         $assignment->save();
+    //     }
+
+    //     $order = Order::find($orderId);
+
+    //     // ✅ If marked progress, update progress field to 2
+    //     if ($progressChanged && $order) {
+    //         $progressField = strtolower($stage) . '_progress';
+    //         if (in_array($progressField, ['sewing_progress', 'embroidery_progress', 'imprinting_progress'])) {
+    //             $order->$progressField = 1;
+    //         }
+    //     }
+
+    //     // ✅ If marked complete, check if all are complete for this section
+    //     if ($completionChanged && $order) {
+    //         $allComplete = OrderAssignment::where('order_id', $orderId)
+    //             ->where('section', $stage)
+    //             ->where('is_complete', 0)
+    //             ->doesntExist(); // No incomplete = all complete
+
+    //         if ($allComplete) {
+    //             $needField = 'need_' . strtolower($stage);
+    //             if (in_array($needField, ['need_sewing', 'need_embroidery', 'need_imprinting'])) {
+    //                 $order->$needField = 1;
+    //             }
+    //         }
+    //     }
+
+    //     if (isset($order)) {
+    //         $order->save();
+    //     }
+
+    //     $this->confirmingStageUpdate = false;
+    //     $this->checkAndAdvanceOrderStage($orderId);
+    // }
 
     public function performStageUpdate()
     {
@@ -464,7 +534,7 @@ class ExternalPendingOrderComponent extends Component
 
         $order = Order::find($orderId);
 
-        // ✅ If marked progress, update progress field to 2
+        // ✅ If marked progress, update progress field
         if ($progressChanged && $order) {
             $progressField = strtolower($stage) . '_progress';
             if (in_array($progressField, ['sewing_progress', 'embroidery_progress', 'imprinting_progress'])) {
@@ -472,14 +542,14 @@ class ExternalPendingOrderComponent extends Component
             }
         }
 
-        // ✅ If marked complete, check if all are complete for this section
+        // ✅ If marked complete, check if all in section are complete
         if ($completionChanged && $order) {
-            $allComplete = OrderAssignment::where('order_id', $orderId)
+            $allCompleteInSection = OrderAssignment::where('order_id', $orderId)
                 ->where('section', $stage)
                 ->where('is_complete', 0)
-                ->doesntExist(); // No incomplete = all complete
+                ->doesntExist(); // No incomplete = all complete in this section
 
-            if ($allComplete) {
+            if ($allCompleteInSection) {
                 $needField = 'need_' . strtolower($stage);
                 if (in_array($needField, ['need_sewing', 'need_embroidery', 'need_imprinting'])) {
                     $order->$needField = 1;
@@ -488,13 +558,24 @@ class ExternalPendingOrderComponent extends Component
         }
 
         if (isset($order)) {
+            // ✅ Check if ALL assignments for this order are complete
+            $allAssignmentsComplete = OrderAssignment::where('order_id', $orderId)
+                ->where('is_complete', 0)
+                ->doesntExist(); // No incomplete assignments at all
+
+            if ($allAssignmentsComplete) {
+                $order->status = 1; // Mark order as ready
+            }
+
             $order->save();
         }
 
         $this->confirmingStageUpdate = false;
+
+        // ✅ Update stage if needed
         $this->checkAndAdvanceOrderStage($orderId);
-        $this->checkAndMarkOrderReady($orderId);
     }
+
 
 
     public function checkAndAdvanceOrderStage($orderId)
@@ -528,34 +609,141 @@ class ExternalPendingOrderComponent extends Component
 
         $order->save();
     }
-    public function checkAndMarkOrderReady($orderId)
-    {
-        $order = \App\Models\Order::find($orderId);
 
-        if (!$order) return;
 
-        $sections = ['Sewing', 'Embroidery', 'Imprinting'];
 
-        foreach ($sections as $section) {
-            $needField = 'need_' . $section;
+    // public function performStageUpdate()
+    // {
+    //     $orderId = $this->confirmingOrderId;
+    //     $stage = $this->confirmingStage;
+    //     $type = $this->confirmingType;
 
-            if ($order->$needField) {
-                $incompleteExists = \App\Models\OrderAssignment::where('order_id', $order->id)
-                    ->where('section', ucfirst($section)) // capitalize to match DB
-                    ->where('is_complete', 0)
-                    ->exists();
+    //     $user = auth()->user();
+    //     $employeeId = $user->employee_id;
 
-                if ($incompleteExists) {
-                    // ❌ One assignment in this section is not complete
-                    return;
-                }
-            }
-        }
+    //     $assignments = OrderAssignment::where('order_id', $orderId)
+    //         ->where('section', $stage)
+    //         ->where('employee_id', $employeeId)
+    //         ->get();
 
-        // ✅ All required sections completed
-        $order->status = 1;
-        $order->save();
-    }
+    //     if ($assignments->isEmpty()) {
+    //         return;
+    //     }
+
+    //     $progressChanged = false;
+    //     $completionChanged = false;
+
+    //     foreach ($assignments as $assignment) {
+    //         if ($type === 'progress') {
+    //             $assignment->is_progress = !$assignment->is_progress;
+
+    //             if ($assignment->is_progress) {
+    //                 $progressChanged = true;
+    //             } else {
+    //                 $assignment->is_complete = 0; // reset complete if progress turned off
+    //             }
+    //         } elseif ($type === 'complete' && $assignment->is_progress) {
+    //             $assignment->is_complete = !$assignment->is_complete;
+    //             $completionChanged = true;
+    //         }
+
+    //         $assignment->save();
+    //     }
+
+    //     $order = Order::find($orderId);
+
+    //     // ✅ If marked progress, update progress field to 2
+    //     if ($progressChanged && $order) {
+    //         $progressField = strtolower($stage) . '_progress';
+    //         if (in_array($progressField, ['sewing_progress', 'embroidery_progress', 'imprinting_progress'])) {
+    //             $order->$progressField = 1;
+    //         }
+    //     }
+
+    //     // ✅ If marked complete, check if all are complete for this section
+    //     if ($completionChanged && $order) {
+    //         $allComplete = OrderAssignment::where('order_id', $orderId)
+    //             ->where('section', $stage)
+    //             ->where('is_complete', 0)
+    //             ->doesntExist(); // No incomplete = all complete
+
+    //         if ($allComplete) {
+    //             $needField = 'need_' . strtolower($stage);
+    //             if (in_array($needField, ['need_sewing', 'need_embroidery', 'need_imprinting'])) {
+    //                 $order->$needField = 1;
+    //             }
+    //         }
+    //     }
+
+    //     if (isset($order)) {
+    //         $order->save();
+    //     }
+
+    //     $this->confirmingStageUpdate = false;
+    //     $this->checkAndAdvanceOrderStage($orderId);
+    //     $this->checkAndMarkOrderReady($orderId);
+    // }
+
+
+    // public function checkAndAdvanceOrderStage($orderId)
+    // {
+    //     $stages = ['Sewing', 'Embroidery', 'Imprinting'];
+
+    //     $order = Order::find($orderId);
+    //     if (!$order || !in_array($order->current_location, $stages)) {
+    //         return;
+    //     }
+
+    //     $currentStage = $order->current_location;
+
+    //     // Get all assignments for current stage
+    //     $assignments = OrderAssignment::where('order_id', $order->id)
+    //         ->where('section', $currentStage)
+    //         ->get();
+
+    //     // Only proceed if all assignments are completed
+    //     if ($assignments->isEmpty() || $assignments->contains(fn($a) => $a->is_complete != 1)) {
+    //         return;
+    //     }
+
+    //     $currentIndex = array_search($currentStage, $stages);
+    //     $nextStage = $stages[$currentIndex + 1] ?? null;
+
+    //     if ($nextStage && $order->{"need_".strtolower($nextStage)}) {
+    //         $order->current_location = $nextStage;
+    //     } else {
+    //     }
+
+    //     $order->save();
+    // }
+    // public function checkAndMarkOrderReady($orderId)
+    // {
+    //     $order = \App\Models\Order::find($orderId);
+
+    //     if (!$order) return;
+
+    //     $sections = ['Sewing', 'Embroidery', 'Imprinting'];
+
+    //     foreach ($sections as $section) {
+    //         $needField = 'need_' . $section;
+
+    //         if ($order->$needField) {
+    //             $incompleteExists = \App\Models\OrderAssignment::where('order_id', $order->id)
+    //                 ->where('section', ucfirst($section)) // capitalize to match DB
+    //                 ->where('is_complete', 0)
+    //                 ->exists();
+
+    //             if ($incompleteExists) {
+    //                 // ❌ One assignment in this section is not complete
+    //                 return;
+    //             }
+    //         }
+    //     }
+
+    //     // ✅ All required sections completed
+    //     $order->status = 1;
+    //     $order->save();
+    // }
 
     public function sortData($sort, $orderBy)
     {

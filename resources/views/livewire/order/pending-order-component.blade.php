@@ -52,6 +52,9 @@
                                     <th class="text-uppercase text-secondary text-xxs font-weight-bolder opacity-7 text-center">
                                         Imprinting
                                     </th>
+                                    <th class="text-uppercase text-secondary text-xxs font-weight-bolder opacity-7 text-center">
+                                        Expected Delivery
+                                    </th>
                                     <th class="text-uppercase text-secondary text-xxs font-weight-bolder opacity-7">Action</th>
                                 </tr>
                             </thead>
@@ -155,10 +158,20 @@
                                         {{ $order->need_imprinting == 1 ?  'checked' : '' }}> --}}
                                     </td>
                                     <td class="align-middle text-center text-sm">
+                                        @if($order->expected_delivery)
+                                           {{ \Carbon\Carbon::parse($order->expected_delivery)->format('M d, Y h:i A') }}
+                                        @else
+                                            <span class="text-muted">N/A</span>
+                                        @endif
+                                    </td>
+
+
+                                    <td class="align-middle text-center text-sm">
                                         <a href="{{ route('order.edit', ['orderId' => $order->id]) }}">
                                             <i class="fa fa-eye text-lg opacity-10" aria-hidden="true"></i>
                                         </a>
                                     </td>
+                                   
 
 
                                 </tr>

@@ -7,6 +7,8 @@ use App\Models\Employee;
 use App\Models\Order;
 use App\Models\OrderLog;
 use App\Models\OrderTrack;
+use Carbon\Carbon;
+use Carbon\CarbonInterval;
 use Livewire\Component;
 
 use Illuminate\Support\Facades\Mail;
@@ -54,56 +56,206 @@ class PendingOrderComponent extends Component
     {
 
     }
+    //  public function orders()
+    // {
+    //     $order = Order::where('status', 0);
+    //     $user = auth()->user();
+
+    //     if ($user->type == 2) {
+    //         $employeeId = $user->employee_id;
+
+    //         // Get all sections the employee is assigned to
+    //         $assignedSections = \App\Models\OrderAssignment::where('employee_id', $employeeId)
+    //             ->pluck('section')
+    //             ->toArray();
+
+    //         $order->where(function ($q) use ($employeeId, $assignedSections) {
+    //             // Case 1: Show if current_location matches employee's assigned section
+    //             $q->whereHas('assignments', function ($q2) use ($employeeId) {
+    //                 $q2->where('employee_id', $employeeId);
+    //             })->whereIn('current_location', $assignedSections);
+    //         })->orWhere(function ($q) use ($employeeId) {
+    //             // Case 2: Previous stage completed, employee assigned for next stage
+    //             $q->whereHas('assignments', function ($q2) use ($employeeId) {
+    //                 $q2->where('employee_id', $employeeId);
+    //             })->where(function ($inner) {
+    //                 $inner->where('need_sewing', 1)
+    //                     ->orWhere('need_embroidery', 1)
+    //                     ->orWhere('need_imprinting', 1);
+    //             });
+    //         });
+    //     }
+
+    //     if ($this->sort) {
+    //         $order->orderBy($this->sort, $this->orderBy);
+    //     } else {
+    //         // $order->oldest();
+    //         $order->orderByDesc('is_priority')  // Show priority orders on top
+    //             ->orderBy('created_at', 'asc');
+    //     }
+
+    //     if ($this->location) {
+    //         $order->where('current_location', $this->location);
+    //     }
+
+    //     if (strlen($this->search) > 3) {
+    //         $search = $this->search;
+    //         $columns = ['order_number', 'current_location'];
+    //         $order->searchLike($columns, $search);
+    //     }
+
+    //     return $order;
+    // }
     public function orders()
     {
-        $order = Order::where('status', 0);
+        $query = Order::with('assignments.employee')->where('status', 0);
         $user = auth()->user();
 
         if ($user->type == 2) {
             $employeeId = $user->employee_id;
 
-            // Get all sections the employee is assigned to
             $assignedSections = \App\Models\OrderAssignment::where('employee_id', $employeeId)
                 ->pluck('section')
                 ->toArray();
 
-            $order->where(function ($q) use ($employeeId, $assignedSections) {
-                // Case 1: Show if current_location matches employee's assigned section
-                $q->whereHas('assignments', function ($q2) use ($employeeId) {
-                    $q2->where('employee_id', $employeeId);
-                })->whereIn('current_location', $assignedSections);
+            $query->where(function ($q) use ($employeeId, $assignedSections) {
+                $q->whereHas('assignments', fn($q2) => $q2->where('employee_id', $employeeId))
+                ->whereIn('current_location', $assignedSections);
             })->orWhere(function ($q) use ($employeeId) {
-                // Case 2: Previous stage completed, employee assigned for next stage
-                $q->whereHas('assignments', function ($q2) use ($employeeId) {
-                    $q2->where('employee_id', $employeeId);
-                })->where(function ($inner) {
+                $q->whereHas('assignments', fn($q2) => $q2->where('employee_id', $employeeId))
+                ->where(function ($inner) {
                     $inner->where('need_sewing', 1)
-                        ->orWhere('need_embroidery', 1)
-                        ->orWhere('need_imprinting', 1);
+                            ->orWhere('need_embroidery', 1)
+                            ->orWhere('need_imprinting', 1);
                 });
             });
         }
 
+        // Sort
         if ($this->sort) {
-            $order->orderBy($this->sort, $this->orderBy);
+            $query->orderBy($this->sort, $this->orderBy);
         } else {
-            // $order->oldest();
-            $order->orderByDesc('is_priority')  // Show priority orders on top
-                ->orderBy('created_at', 'asc');
+            $query->orderByDesc('is_priority')->orderBy('created_at', 'asc');
         }
 
         if ($this->location) {
-            $order->where('current_location', $this->location);
+            $query->where('current_location', $this->location);
         }
 
         if (strlen($this->search) > 3) {
             $search = $this->search;
             $columns = ['order_number', 'current_location'];
-            $order->searchLike($columns, $search);
+            $query->searchLike($columns, $search);
         }
 
-        return $order;
+        // Paginate first
+        $orders = $query->paginate(20);
+
+        // Transform paginated results
+        $orders->getCollection()->transform(function ($order) {
+            $latestEnd = null;
+            $totalSeconds = 0;
+
+            foreach ($order->assignments as $assignment) {
+                $employee = $assignment->employee;
+
+                // Skip if missing or invalid time data
+                if (
+                    !$employee ||
+                    !$employee->working_hours_start || !$employee->working_hours_end ||
+                    !$employee->time_per_garment
+                ) {
+                    continue;
+                }
+
+                $timePerGarment = CarbonInterval::createFromFormat('H:i:s', $employee->time_per_garment);
+                if ($timePerGarment->totalSeconds === 0 || $timePerGarment->totalSeconds > 8 * 3600) {
+                    continue; // Skip if 0 or more than 8 hours per garment
+                }
+
+                $startHour = Carbon::createFromFormat('H:i:s', $employee->working_hours_start);
+                $endHour = Carbon::createFromFormat('H:i:s', $employee->working_hours_end);
+
+                $garmentCount = $assignment->garments_assigned;
+                $secondsRequired = $timePerGarment->totalSeconds * $garmentCount;
+
+                $startTime = $this->normalizeStartTime(now()->copy(), $startHour, $endHour);
+                $endTime = $this->addWorkingTime($startTime, $secondsRequired, $startHour, $endHour);
+
+                $totalSeconds += $secondsRequired;
+
+                if (!$latestEnd || $endTime->gt($latestEnd)) {
+                    $latestEnd = $endTime;
+                }
+            }
+
+            $order->overall_eta = gmdate('H:i:s', $totalSeconds);
+            $order->expected_delivery = $latestEnd ? $latestEnd->format('d F Y') : null;
+
+            return $order;
+        });
+
+        return $orders;
     }
+    protected function isWeekend(Carbon $date)
+    {
+        return $date->isSaturday() || $date->isSunday();
+    }
+
+    protected function normalizeStartTime(Carbon $dateTime, Carbon $startHour, Carbon $endHour)
+    {
+        if ($this->isWeekend($dateTime)) {
+            $dateTime->addDay();
+            while ($this->isWeekend($dateTime)) {
+                $dateTime->addDay();
+            }
+            return $dateTime->setTimeFrom($startHour);
+        }
+
+        $workStart = $dateTime->copy()->setTimeFrom($startHour);
+        $workEnd = $dateTime->copy()->setTimeFrom($endHour);
+
+        if ($dateTime->lt($workStart)) return $workStart;
+        if ($dateTime->gte($workEnd)) {
+            $dateTime->addDay();
+            while ($this->isWeekend($dateTime)) {
+                $dateTime->addDay();
+            }
+            return $dateTime->setTimeFrom($startHour);
+        }
+
+        return $dateTime;
+    }
+
+    protected function addWorkingTime(Carbon $start, $seconds, Carbon $startHour, Carbon $endHour)
+    {
+        $current = $start->copy();
+        $remaining = $seconds;
+
+        while ($remaining > 0) {
+            if ($this->isWeekend($current)) {
+                $current->addDay()->setTimeFrom($startHour);
+                continue;
+            }
+
+            $endOfDay = $current->copy()->setTimeFrom($endHour);
+            $available = $current->diffInSeconds($endOfDay);
+            $consume = min($available, $remaining);
+
+            $current->addSeconds($consume);
+            $remaining -= $consume;
+
+            if ($remaining > 0) {
+                $current->addDay()->setTimeFrom($startHour);
+                while ($this->isWeekend($current)) {
+                    $current->addDay();
+                }
+            }
+        }
+
+        return $current;
+    }
+
 
 
     public function sortData($sort, $orderBy)
@@ -111,13 +263,14 @@ class PendingOrderComponent extends Component
         $this->orderBy = $orderBy;
         $this->sort  = $sort;
     }
-    public function render()
-    {
-        $this->dispatch('sticky-header'); 
-        return view('livewire.order.pending-order-component', [
-            'orders' => $this->orders()->paginate(20)
-        ]);
-    }
+   public function render()
+{
+    $this->dispatch('sticky-header'); 
+    return view('livewire.order.pending-order-component', [
+        'orders' => $this->orders()
+    ]);
+}
+
     public function updateSweing($status, $orderId, $updated_by)
     {
 
@@ -175,7 +328,7 @@ class PendingOrderComponent extends Component
 
         if($allCount == $ready && isset($order->employee->email)) {
            
-            Mail::to($order->employee->email)->send(new ReadyEmail($order));
+            // Mail::to($order->employee->email)->send(new ReadyEmail($order));
             $order->status = 1;
             $order->update();
         }

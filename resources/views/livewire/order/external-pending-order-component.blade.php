@@ -158,8 +158,8 @@
                                             <!-- Delivery Date/Time -->
                                             <td>
                                                 @if(!empty($order->eta_data))
-                                                    <strong>{{ $order->eta_data['section'] }} Delivery:</strong>
-                                                    {{ \Carbon\Carbon::parse($order->eta_data['expected_delivery'])->format('M d Y') }}
+                                                    {{-- <strong>{{ $order->eta_data['section'] }} Delivery:</strong> --}}
+                                                    {{ \Carbon\Carbon::parse($order->eta_data['expected_delivery'])->format('M d, Y h:i A') }}
                                                 @else
                                                     <span class="text-muted">—</span>
                                                 @endif
