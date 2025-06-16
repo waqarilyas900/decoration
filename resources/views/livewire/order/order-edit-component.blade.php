@@ -365,7 +365,7 @@
                                             </option>
                                         @endforeach
                                     </select> --}}
-                                    <select class="form-select" wire:model="splitEntries.{{ $index }}.employee_id">
+                                     <select class="form-select" wire:model="splitEntries.{{ $index }}.employee_id">
                                         <option value="">Select Employee</option>
                                         @foreach($external_employees as $employee)
                                             @php
