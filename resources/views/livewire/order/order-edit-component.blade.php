@@ -321,7 +321,8 @@
                 <td>{{ $item->title }}</td>
                 <td>{{ $item->user?->first_name }} {{ $item->user?->last_name }}</td>
                 <td>-</td>
-                <td class="text-center">{{ $item->created_at->format('d-m-Y h:i A') }}</td>
+                <td class="text-center">{{ $item->created_at->format('M d, Y h:i A') }}</td>
+                
             </tr>
         @endforeach
 
@@ -334,7 +335,7 @@
                 <td>
                    {{ $log->garments_assigned }}
                 </td>
-                <td class="text-center">{{ $log->created_at->format('d-m-Y h:i A') }}</td>
+                <td class="text-center">{{ $log->created_at->format('M d, Y h:i A') }}</td>
             </tr>
         @endforeach
     </tbody>

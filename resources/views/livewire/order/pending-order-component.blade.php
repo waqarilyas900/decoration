@@ -96,7 +96,7 @@
                                         <td class="align-middle text-center text-sm" style="border-right: 2px solid #e9ecef; border-left: 2px solid #e9ecef;">
                                         <div class="d-flex justify-content-center gap-2">
                                                 <div>
-                                                    <label class="d-block">In-Progress</label>
+                                                   <label class="d-block">In&#8209;Progress</label>
                                                         <input type="checkbox" id="inprogres{{ $order->id }}"
                                                         onchange="inProgress('inprogres{{ $order->id }}', {{ $order }})"
                                                         @disabled(!$order->need_sewing || $order->need_sewing == 1)
@@ -116,7 +116,7 @@
 
                                         <div class="d-flex justify-content-center gap-2">
                                             <div>
-                                                <label class="d-block">In-Progress</label>
+                                                <label class="d-block">In&#8209;Progress</label>
                                                     <input type="checkbox" id="inprogresEmb{{ $order->id }}"
                                                     onchange="inProgressEmb('inprogresEmb{{ $order->id }}', {{ $order }})"
                                                     @disabled(!$order->need_embroidery || $order->need_embroidery == 1)
@@ -138,7 +138,7 @@
                                     <td class="align-middle text-center text-sm" style="border-right: 2px solid #e9ecef;">
                                         <div class="d-flex justify-content-center gap-2">
                                             <div>
-                                                <label class="d-block">In-Progress</label>
+                                                <label class="d-block">In&#8209;Progress</label>
                                                     <input type="checkbox" id="inprogresImp{{ $order->id }}"
                                                     onchange="inProgressImp('inprogresImp{{ $order->id }}', {{ $order }})"
                                                     @disabled(!$order->need_imprinting || $order->need_imprinting == 1)

@@ -88,7 +88,7 @@
                                         <td class="align-middle text-center text-sm" style="border-right: 2px solid #e9ecef; border-left: 2px solid #e9ecef;">
                                             <div class="d-flex justify-content-center gap-2">
                                                 <div>
-                                                    <label class="d-block">In-Progress</label>
+                                                    <label class="d-block">In&#8209;Progress</label>
                                                     <input type="checkbox"
                                                         wire:click="confirmStageUpdate({{ $order->id }}, 'Sewing', 'progress')"
 
@@ -110,7 +110,7 @@
                                         <td class="align-middle text-center text-sm" style="border-right: 2px solid #e9ecef;">
                                             <div class="d-flex justify-content-center gap-2">
                                                 <div>
-                                                    <label class="d-block">In-Progress</label>
+                                                    <label class="d-block">In&#8209;Progress</label>
                                                     <input type="checkbox"
                                                          wire:click="confirmStageUpdate({{ $order->id }}, 'Embroidery', 'progress')"
                                                         @disabled(!isset($assignments['Embroidery']))
@@ -130,7 +130,7 @@
                                         <td class="align-middle text-center text-sm" style="border-right: 2px solid #e9ecef;">
                                             <div class="d-flex justify-content-center gap-2">
                                                 <div>
-                                                    <label class="d-block">In-Progress</label>
+                                                    <label class="d-block">In&#8209;Progress</label>
                                                     <input type="checkbox"
                                                          wire:click="confirmStageUpdate({{ $order->id }}, 'Imprinting', 'progress')"
                                                         @disabled(!isset($assignments['Imprinting']))

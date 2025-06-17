@@ -5,6 +5,7 @@ namespace App\Livewire\Order;
 use App\Mail\ReadyEmail;
 use App\Models\Employee;
 use App\Models\Order;
+use App\Models\OrderAssignment;
 use App\Models\OrderLog;
 use App\Models\OrderTrack;
 use Carbon\Carbon;
@@ -131,7 +132,7 @@ class PendingOrderComponent extends Component
             });
         }
 
-        // Sort
+        // Sorting
         if ($this->sort) {
             $query->orderBy($this->sort, $this->orderBy);
         } else {
@@ -143,45 +144,42 @@ class PendingOrderComponent extends Component
         }
 
         if (strlen($this->search) > 3) {
-            $search = $this->search;
-            $columns = ['order_number', 'current_location'];
-            $query->searchLike($columns, $search);
+            $query->searchLike(['order_number', 'current_location'], $this->search);
         }
 
-        // Paginate first
         $orders = $query->paginate(20);
 
-        // Transform paginated results
         $orders->getCollection()->transform(function ($order) {
-            $latestEnd = null;
             $totalSeconds = 0;
+            $cursorTime = now()->copy(); // shared tracker for all assignments in this order
+            $latestEnd = null;
 
             foreach ($order->assignments as $assignment) {
                 $employee = $assignment->employee;
 
-                // Skip if missing or invalid time data
                 if (
                     !$employee ||
                     !$employee->working_hours_start || !$employee->working_hours_end ||
                     !$employee->time_per_garment
-                ) {
-                    continue;
-                }
-
-                $timePerGarment = CarbonInterval::createFromFormat('H:i:s', $employee->time_per_garment);
-                if ($timePerGarment->totalSeconds === 0 || $timePerGarment->totalSeconds > 8 * 3600) {
-                    continue; // Skip if 0 or more than 8 hours per garment
-                }
+                ) continue;
 
                 $startHour = Carbon::createFromFormat('H:i:s', $employee->working_hours_start);
                 $endHour = Carbon::createFromFormat('H:i:s', $employee->working_hours_end);
+                $timePerGarment = CarbonInterval::createFromFormat('H:i:s', $employee->time_per_garment);
 
-                $garmentCount = $assignment->garments_assigned;
-                $secondsRequired = $timePerGarment->totalSeconds * $garmentCount;
+                if ($timePerGarment->totalSeconds <= 0 || $timePerGarment->totalSeconds > 8 * 3600) {
+                    continue; // skip if invalid
+                }
 
-                $startTime = $this->normalizeStartTime(now()->copy(), $startHour, $endHour);
-                $endTime = $this->addWorkingTime($startTime, $secondsRequired, $startHour, $endHour);
+                $garments = $assignment->garments_assigned;
+                $secondsRequired = $timePerGarment->totalSeconds * $garments;
 
+                // Normalize cursor time per assignment
+                $cursorTime = $this->normalizeStartTime($cursorTime, $startHour, $endHour);
+                $endTime = $this->addWorkingTime($cursorTime->copy(), $secondsRequired, $startHour, $endHour);
+
+                // update shared timer and stats
+                $cursorTime = $endTime->copy();
                 $totalSeconds += $secondsRequired;
 
                 if (!$latestEnd || $endTime->gt($latestEnd)) {
@@ -190,13 +188,14 @@ class PendingOrderComponent extends Component
             }
 
             $order->overall_eta = gmdate('H:i:s', $totalSeconds);
-            $order->expected_delivery = $latestEnd ? $latestEnd->format('d F Y') : null;
+            $order->expected_delivery = $latestEnd ? $latestEnd : null;
 
             return $order;
         });
 
         return $orders;
     }
+
     protected function isWeekend(Carbon $date)
     {
         return $date->isSaturday() || $date->isSunday();
@@ -296,6 +295,14 @@ class PendingOrderComponent extends Component
         if($status)
         {
             $msg = "completed";
+
+            OrderAssignment::where('order_id', $order->id)
+            ->where('section', 'Sewing')
+            ->update([
+                'is_progress' => 1,
+                'is_complete' => 1
+            ]);
+
             OrderTrack::forceCreate([
                 'order_id' => $order->id,
                 'type' => 1,
@@ -304,6 +311,13 @@ class PendingOrderComponent extends Component
         }
         else
         {
+            OrderAssignment::where('order_id', $order->id)
+            ->where('section', 'Sewing')
+            ->update([
+                'is_progress' => 0,
+                'is_complete' => 0
+            ]);
+
             OrderTrack::where('type', 1)->where('order_id', $order->id)->where('status', 1)->delete();
             $msg = "unchecked";
             $order->need_sewing = 2;
@@ -328,7 +342,7 @@ class PendingOrderComponent extends Component
 
         if($allCount == $ready && isset($order->employee->email)) {
            
-            // Mail::to($order->employee->email)->send(new ReadyEmail($order));
+            Mail::to($order->employee->email)->send(new ReadyEmail($order));
             $order->status = 1;
             $order->update();
         }
@@ -400,6 +414,12 @@ class PendingOrderComponent extends Component
 
             // dd('asd');
             $msg = "completed";
+            OrderAssignment::where('order_id', $order->id)
+            ->where('section', 'Embroidery')
+            ->update([
+                'is_progress' => 1,
+                'is_complete' => 1
+            ]);
             OrderTrack::forceCreate([
                 'order_id' => $order->id,
                 'type' => 2,
@@ -409,6 +429,13 @@ class PendingOrderComponent extends Component
         }
         else
         {
+            OrderAssignment::where('order_id', $order->id)
+            ->where('section', 'Embroidery')
+            ->update([
+                'is_progress' => 0,
+                'is_complete' => 0
+            ]);
+
             OrderTrack::where('type', 2)->where('order_id', $order->id)->where('status', 1)->delete();
             $msg = "unchecked";
             $order->need_embroidery = 2;
@@ -500,6 +527,12 @@ class PendingOrderComponent extends Component
         if($status)
         {
             $msg = "completed";
+            OrderAssignment::where('order_id', $order->id)
+            ->where('section', 'Imprinting')
+            ->update([
+                'is_progress' => 1,
+                'is_complete' => 1
+            ]);
             OrderTrack::forceCreate([
                 'order_id' => $order->id,
                 'type' => 3,
@@ -508,6 +541,12 @@ class PendingOrderComponent extends Component
         }
         else
         {
+            OrderAssignment::where('order_id', $order->id)
+            ->where('section', 'Imprinting')
+            ->update([
+                'is_progress' => 0,
+                'is_complete' => 0
+            ]);
             OrderTrack::where('type', 3)->where('status', 1)->where('order_id', $order->id)->delete();
             $msg = "unchecked";
             $order->need_imprinting = 2;
