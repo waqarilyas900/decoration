@@ -325,6 +325,12 @@ class OrderEditComponent extends Component
     {
         $this->resetErrorBag();
         $this->splitSection = $section;
+        $this->external_employees = Employee::where('type', 2)
+        ->where('active', 1)
+        ->where('is_delete', 0)
+        ->where('department', $section)
+        ->orderBy('first_name', 'asc')
+        ->get();
         $this->pendingOrdersPerEmployee = $this->getPendingOrdersCountPerEmployee($section);
         // If already exists, use it
         if (isset($this->allSplitEntries[$section])) {

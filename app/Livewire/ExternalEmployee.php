@@ -29,6 +29,7 @@ class ExternalEmployee extends Component
         return [
             'record.first_name' => 'required',
             'record.last_name' => 'required',
+            'record.department' => 'required',
             'record.working_hours_start' => 'required|date_format:H:i',
             'record.working_hours_end' => 'required|date_format:H:i',
             'time_per_garment_hours' => 'required|integer|min:0',

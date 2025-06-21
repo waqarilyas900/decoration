@@ -13,6 +13,11 @@ class Employee extends Model
     protected $fillable = [
         'is_delete'
     ];
+
+    public function assignments()
+    {
+        return $this->hasMany(OrderAssignment::class);
+    }
     public function scopeSearchLike($query, $columns, $keyword)
     {
         return $query->where(function ($query) use ($columns, $keyword) {

@@ -131,28 +131,24 @@
                                     </div>
                                 </div>
                             </div>
-
-
-                            <!-- Time per Garment -->
+                            <!-- Department -->
                             <div class="col-md-6">
                                 <div class="mb-0">
-                                    <label class="form-label h5">TIME PER GARMENT</label>
-                                    <div class="d-flex gap-2 align-items-center">
-                                        <input type="number"  class="form-control" style="width: 100px;"
-                                            placeholder="Hours" wire:model="time_per_garment_hours">
-
-                                        <span class="h5 m-0">:</span>
-
-                                        <input type="number"  class="form-control" style="width: 100px;"
-                                            placeholder="Minutes" wire:model="time_per_garment_minutes">
-                                    </div>
-
+                                    <label for="department" class="form-label h5">DEPARTMENT</label>
+                                    <select class="form-control" id="department" wire:model="record.department">
+                                        <option value="">Select Department</option>
+                                        <option value="Sewing">Sewing</option>
+                                        <option value="Embroidery">Embroidery</option>
+                                        <option value="Imprinting">Imprinting</option>
+                                    </select>
                                     <div class="form-text text-danger mb-4">
-                                        @error('time_per_garment_hours') <b>{{ $message }}</b> @enderror
-                                        @error('time_per_garment_minutes') <b>{{ $message }}</b> @enderror
+                                        @error('record.department') <b>{{ $message }}</b> @enderror
                                     </div>
                                 </div>
                             </div>
+
+
+                           
                             <!-- Working Hours Start -->
                             <div class="col-md-6">
                                 <div class="mb-0">
@@ -179,7 +175,26 @@
                                 </div>
                             </div>
 
-                           
+                            <!-- Time per Garment -->
+                            <div class="col-md-6">
+                                <div class="mb-0">
+                                    <label class="form-label h5">TIME PER GARMENT</label>
+                                    <div class="d-flex gap-2 align-items-center">
+                                        <input type="number"  class="form-control" style="width: 100px;"
+                                            placeholder="Hours" wire:model="time_per_garment_hours">
+
+                                        <span class="h5 m-0">:</span>
+
+                                        <input type="number"  class="form-control" style="width: 100px;"
+                                            placeholder="Minutes" wire:model="time_per_garment_minutes">
+                                    </div>
+
+                                    <div class="form-text text-danger mb-4">
+                                        @error('time_per_garment_hours') <b>{{ $message }}</b> @enderror
+                                        @error('time_per_garment_minutes') <b>{{ $message }}</b> @enderror
+                                    </div>
+                                </div>
+                            </div>
 
 
                         </div>

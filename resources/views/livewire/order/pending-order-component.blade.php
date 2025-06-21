@@ -439,43 +439,100 @@
         }
 
 
-        function onSelectChange(selectId, order) {
-            var order = order
-            // console.log(order.current_location)
-            var selectedValue = document.getElementById(selectId).value;
-            var selectElement = document.getElementById(selectId);
-            var selectedOption = selectElement.options[selectElement.selectedIndex];
-            var selectedText = selectedOption.text;
+        // function onSelectChange(selectId, order) {
+        //     var order = order
+        //     // console.log(order.current_location)
+        //     var selectedValue = document.getElementById(selectId).value;
+        //     var selectElement = document.getElementById(selectId);
+        //     var selectedOption = selectElement.options[selectElement.selectedIndex];
+        //     var selectedText = selectedOption.text;
 
-            Swal.fire({
-                title: 'Change?',
-                text: "You are about to move order #" + order.order_number + " from " + order.current_location +
-                    " to " + selectedText + '.',
-                icon: 'warning',
-                input: 'select',
-                inputOptions: @json($employees),
-                inputPlaceholder: 'Select employee',
-                showCancelButton: true,
-                confirmButtonText: 'Yes',
-                cancelButtonText: 'No',
-                preConfirm: (inputValue) => {
-                    if (!inputValue) {
-                        Swal.showValidationMessage("Field is required!");
+        //     Swal.fire({
+        //         title: 'Change?',
+        //         text: "You are about to move order #" + order.order_number + " from " + order.current_location +
+        //             " to " + selectedText + '.',
+        //         icon: 'warning',
+        //         input: 'select',
+        //         inputOptions: @json($employees),
+        //         inputPlaceholder: 'Select employee',
+        //         showCancelButton: true,
+        //         confirmButtonText: 'Yes',
+        //         cancelButtonText: 'No',
+        //         preConfirm: (inputValue) => {
+        //             if (!inputValue) {
+        //                 Swal.showValidationMessage("Field is required!");
+        //             }
+        //             @this.set('ready_by', inputValue);
+        //         }
+        //     }).then((result) => {
+        //         if (result.isConfirmed && result.value) {
+        //             if (selectedValue === 'Yes') {
+        //                 @this.updateLocation(selectId, result.value, selectedText)
+        //             } else {
+        //                 @this.updateLocation(selectId, result.value, selectedText)
+        //             }
+        //         } else {
+        //             document.getElementById(selectId).value = order.current_location;
+        //         }
+        //     });
+        // }
+        window.addEventListener('livewire:initialized', () => {
+            let pendingOrderData = null; // temporary store for order info while we wait for employees
+
+            Livewire.on('assigned-employees-loaded', ({ assigned }) => {
+                if (!pendingOrderData) return;
+
+                const { order, selectedText, selectId } = pendingOrderData;
+
+                const assignedHtml = assigned.length > 0
+                    ? '<br><strong>' + assigned.join('<br>') + '</strong>'
+                    : '<br><em>No employees assigned.</em>';
+
+                Swal.fire({
+                    title: 'Confirm Handover',
+                    html: `You are about to move order <strong>#${order.order_number}</strong> from <strong>${order.current_location}</strong> to <strong>${selectedText}</strong>.<br><br>Assigned Employees:${assignedHtml}`,
+                    icon: 'warning',
+                    input: 'select',
+                    inputOptions: @json($employees),
+                    inputPlaceholder: 'Select employee',
+                    showCancelButton: true,
+                    confirmButtonText: 'Yes',
+                    cancelButtonText: 'No',
+                    preConfirm: (inputValue) => {
+                        if (!inputValue) {
+                            Swal.showValidationMessage("Field is required!");
+                        }
+                        @this.set('ready_by', inputValue);
                     }
-                    @this.set('ready_by', inputValue);
-                }
-            }).then((result) => {
-                if (result.isConfirmed && result.value) {
-                    if (selectedValue === 'Yes') {
-                        @this.updateLocation(selectId, result.value, selectedText)
+                }).then((result) => {
+                    if (result.isConfirmed && result.value) {
+                        @this.updateLocation(order.id, result.value, selectedText);
                     } else {
-                        @this.updateLocation(selectId, result.value, selectedText)
+                        document.getElementById(selectId).value = order.current_location;
                     }
-                } else {
-                    document.getElementById(selectId).value = order.current_location;
-                }
+
+                    pendingOrderData = null; // reset after done
+                });
             });
-        }
+
+            window.onSelectChange = function(selectId, order) {
+                const selectedValue = document.getElementById(selectId).value;
+                const selectElement = document.getElementById(selectId);
+                const selectedOption = selectElement.options[selectElement.selectedIndex];
+                const selectedText = selectedOption.text;
+
+                // Save current context
+                pendingOrderData = { order, selectedText, selectId };
+
+                // Fetch assigned employees first
+                Livewire.dispatch('fetchAssignedEmployees', {
+                    orderId: order.id,
+                    section: selectedText,
+                    currentLocation: order.current_location
+                });
+            };
+        });
+
     </script>
 <style>
     .form-control.mb-3{

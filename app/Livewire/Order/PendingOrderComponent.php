@@ -16,6 +16,7 @@ use Illuminate\Support\Facades\Mail;
 use Livewire\WithPagination;
 use Livewire\Attributes\Session;
 use Livewire\Attributes\Url;
+use Livewire\Attributes\On;
 
 class PendingOrderComponent extends Component 
 {
@@ -193,6 +194,62 @@ class PendingOrderComponent extends Component
             return $order;
         });
 
+        // $globalCursor = now()->copy(); // Shared clock across all orders
+
+        // $orders->getCollection()->transform(function ($order) use (&$globalCursor) {
+        //     $totalSeconds = 0;
+        //     $cursorTime = $globalCursor->copy(); // Independent cursor for this order
+        //     $latestEnd = null;
+
+        //     // Dynamically sort assignments as per their creation (or sequence)
+        //     $sortedAssignments = $order->assignments->sortBy('id'); // or 'created_at'
+
+        //     foreach ($sortedAssignments as $assignment) {
+        //         $employee = $assignment->employee;
+
+        //         if (
+        //             !$employee ||
+        //             !$employee->working_hours_start || !$employee->working_hours_end ||
+        //             !$employee->time_per_garment
+        //         ) continue;
+
+        //         $startHour = Carbon::createFromFormat('H:i:s', $employee->working_hours_start);
+        //         $endHour = Carbon::createFromFormat('H:i:s', $employee->working_hours_end);
+        //         $timePerGarment = CarbonInterval::createFromFormat('H:i:s', $employee->time_per_garment);
+
+        //         if ($timePerGarment->totalSeconds <= 0 || $timePerGarment->totalSeconds > 8 * 3600) {
+        //             continue;
+        //         }
+
+        //         $garments = $assignment->garments_assigned;
+        //         $secondsRequired = $timePerGarment->totalSeconds * $garments;
+
+        //         // Normalize and calculate ETA for this assignment
+        //         $cursorTime = $this->normalizeStartTime($cursorTime, $startHour, $endHour);
+        //         $endTime = $this->addWorkingTime($cursorTime->copy(), $secondsRequired, $startHour, $endHour);
+
+        //         // Update per-assignment timer
+        //         $cursorTime = $endTime->copy();
+        //         $totalSeconds += $secondsRequired;
+
+        //         // Update order-wide latest end time
+        //         if (!$latestEnd || $endTime->gt($latestEnd)) {
+        //             $latestEnd = $endTime;
+        //         }
+        //     }
+
+        //     // Priority orders reserve their delivery window earlier
+        //     if ($order->is_priority) {
+        //         $globalCursor = $cursorTime->copy();
+        //     }
+
+        //     $order->overall_eta = gmdate('H:i:s', $totalSeconds);
+        //     $order->expected_delivery = $latestEnd;
+
+        //     return $order;
+        // });
+
+
         return $orders;
     }
 
@@ -314,7 +371,7 @@ class PendingOrderComponent extends Component
             OrderAssignment::where('order_id', $order->id)
             ->where('section', 'Sewing')
             ->update([
-                'is_progress' => 0,
+                // 'is_progress' => 0,
                 'is_complete' => 0
             ]);
 
@@ -432,7 +489,7 @@ class PendingOrderComponent extends Component
             OrderAssignment::where('order_id', $order->id)
             ->where('section', 'Embroidery')
             ->update([
-                'is_progress' => 0,
+                // 'is_progress' => 0,
                 'is_complete' => 0
             ]);
 
@@ -544,7 +601,7 @@ class PendingOrderComponent extends Component
             OrderAssignment::where('order_id', $order->id)
             ->where('section', 'Imprinting')
             ->update([
-                'is_progress' => 0,
+                // 'is_progress' => 0,
                 'is_complete' => 0
             ]);
             OrderTrack::where('type', 3)->where('status', 1)->where('order_id', $order->id)->delete();
@@ -626,6 +683,27 @@ class PendingOrderComponent extends Component
             'order_id' => $order->id
         ]);
     }
-    
-    
+    #[On('fetchAssignedEmployees')]
+    public function fetchAssignedEmployees($orderId, $section, $currentLocation)
+    {
+
+        $assigned = Employee::whereHas('assignments', function ($q) use ($orderId, $section, $currentLocation) {
+                $q->where('order_id', $orderId)
+                ->where('section', $section)
+                ->where(function ($sub) use ($currentLocation) {
+                    $sub->whereNull('location')
+                        ->orWhere('location', $currentLocation);
+                });
+            })
+            ->where('type', 2)
+            ->where('active', 1)
+            ->where('is_delete', 0)
+            ->get();
+
+        $assignedNames = $assigned->map(function ($e) {
+            return trim("{$e->first_name} {$e->last_name}");
+        })->toArray();
+
+        $this->dispatch('assigned-employees-loaded', assigned: $assignedNames);
+    } 
 }
