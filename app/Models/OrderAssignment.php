@@ -12,7 +12,8 @@ class OrderAssignment extends Model
         'order_id',
         'employee_id',
         'garments_assigned',
-        'section'
+        'section',
+        'location',
     ];
 
     public function order()

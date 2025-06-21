@@ -169,6 +169,12 @@ class Create extends Component
     {
          $this->resetErrorBag();
         $this->splitSection = $section;
+        $this->external_employees = Employee::where('type', 2)
+        ->where('active', 1)
+        ->where('is_delete', 0)
+        ->where('department', $section)
+        ->orderBy('first_name', 'asc')
+        ->get();
 
         // Load pending order counts per employee for the current section
         $this->pendingOrdersPerEmployee = $this->getPendingOrdersCountPerEmployee($section);
