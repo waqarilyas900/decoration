@@ -100,7 +100,7 @@ class ReadyOrderComponent extends Component
     }
     public function orders()
     {
-       
+        
         $order =  Order::where('status', 1);
         if($this->employee_id) {
             $numbersOnly = preg_replace("/[^0-9]/", "", $this->employee_id);
@@ -136,7 +136,25 @@ class ReadyOrderComponent extends Component
     public function updateSweing($status, $orderId, $updated_by)
     {
         $numbersOnly = preg_replace("/[^0-9]/", "", $orderId);
-        $order = Order::find($numbersOnly);  
+        // $order = Order::whereHas('assignments',function($q){
+        //     $q->where('section', 'Sewing');
+        // })->find($numbersOnly);  
+
+        $order = Order::whereHas('assignments', function ($q) {
+            $q->where('section', 'Sewing');
+        })->find($numbersOnly);
+
+        if ($order) {
+            $order->assignments()
+                ->where('section', 'Sewing')
+                ->update(['is_complete' => 0]);
+        }
+         if($order){
+            $order->assignments()->update([
+                'location' => null,
+            ]);
+        }
+       
         ////
         $ready = 0;
         $allCount = 0;
@@ -149,6 +167,10 @@ class ReadyOrderComponent extends Component
         if($order->need_imprinting != 0) {
             $allCount += 1;
         }
+        $orderId   = $order->id;
+
+
+        
 
         ////////
         $order->need_sewing = $status;
@@ -162,6 +184,7 @@ class ReadyOrderComponent extends Component
             $msg = "unchecked";
             $order->need_sewing = 2;
             $order->update();
+            
         }
         OrderLog::forceCreate([
             'title' => "Sewing mark as $msg",
@@ -205,7 +228,22 @@ class ReadyOrderComponent extends Component
     public function updateEmb($status, $orderId, $updated_by)
     {
         $numbersOnly = preg_replace("/[^0-9]/", "", $orderId);
-        $order = Order::find($numbersOnly);  
+        // $order = Order::find($numbersOnly); 
+         $order = Order::whereHas('assignments', function ($q) {
+            $q->where('section', 'Embroidery');
+        })->find($numbersOnly);
+
+        if ($order) {
+            $order->assignments()
+                ->where('section', 'Embroidery')
+                ->update(['is_complete' => 0]);
+        } 
+        ///
+         if($order){
+            $order->assignments()->update([
+            'location' => null,
+        ]);
+        }
         ///
         $ready = 0;
         $allCount = 0;
@@ -258,8 +296,22 @@ class ReadyOrderComponent extends Component
     public function updateImp($status, $orderId, $updated_by)
     {
         $numbersOnly = preg_replace("/[^0-9]/", "", $orderId);
-        $order = Order::find($numbersOnly);  
-         ///
+        // $order = Order::find($numbersOnly);  
+
+        $order = Order::whereHas('assignments', function ($q) {
+            $q->where('section', 'Imprinting');
+        })->find($numbersOnly);
+
+        if ($order) {
+            $order->assignments()
+                ->where('section', 'Imprinting')        
+                ->update(['is_complete' => 0]);
+        } 
+         if($order){
+            $order->assignments()->update([
+            'location' => null,
+        ]);
+        }
          $ready = 0;
          $allCount = 0;
          if($order->need_sewing != 0) {
@@ -321,6 +373,11 @@ class ReadyOrderComponent extends Component
     public function updateLocation($orderId, $updated_by, $selectedText)
     {
         $order = Order::find($orderId);
+         if($order){
+            $order->assignments()->update([
+                'location' => null,
+            ]);
+        }
         $location = $order->current_location;
         $order->current_location=$selectedText;
         $order->update();

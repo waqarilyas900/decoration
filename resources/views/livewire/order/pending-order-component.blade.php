@@ -15,6 +15,22 @@
                                 <option value="Imprinting">Imprinting</option>
                             </select>
                         </div>
+                        <div class="col-md-3">
+                            <select class="form-select form-select-lg mb-3 mb-md-0" wire:model.live="internal_employee">
+                                <option value="">Select Internal Employee</option>
+                                    @foreach($internalEmployees as $id => $name)
+                                        <option value="{{ $id }}">{{ $name }}</option>
+                                    @endforeach
+                            </select>
+                        </div>
+                        <div class="col-md-3">
+                            <select class="form-select form-select-lg mb-3 mb-md-0" wire:model.live="external_employee">
+                                <option value="">Select External Employee</option>
+                                    @foreach($employees as $id => $name)
+                                        <option value="{{ $id }}">{{ $name }}</option>
+                                    @endforeach
+                            </select>
+                        </div>
                     </div>
                 </div>
                 <div class="card-body px-0 pt-0 pb-2 mt-3">

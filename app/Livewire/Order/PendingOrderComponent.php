@@ -10,6 +10,7 @@ use App\Models\OrderLog;
 use App\Models\OrderTrack;
 use Carbon\Carbon;
 use Carbon\CarbonInterval;
+use Illuminate\Support\Facades\Log;
 use Livewire\Component;
 
 use Illuminate\Support\Facades\Mail;
@@ -30,18 +31,19 @@ class PendingOrderComponent extends Component
     use WithPagination;
     protected $paginationTheme = 'bootstrap';
     public $need_sewing;
-    
     public $by_user;
     public $sort;
     public $orderBy;
-   
+    public $internal_employee;
+    public $external_employee;
     public $employees = [];
+    public $internalEmployees = [];
     public function mount()
     {
         $this->employees = Employee::where('type', 2)
         ->where('active', 1)
         ->where('is_delete', 0)
-        ->orderBy('first_name', 'asc') // Move orderBy before get()
+        ->orderBy('first_name', 'asc')
         ->get()
         ->map(function ($employee) {
             $employee['full_name'] = $employee->first_name . ' ' . $employee->last_name;
@@ -49,6 +51,15 @@ class PendingOrderComponent extends Component
             return $employee;
         })
         ->pluck('full_name', 'empId');
+
+         $this->internalEmployees = Employee::where('type', 1)
+        ->where('active', 1)
+        ->where('is_delete', 0)
+        ->orderBy('first_name', 'asc')
+        ->get()
+        ->mapWithKeys(function ($employee) {
+            return ['emp' . $employee->id => $employee->first_name . ' ' . $employee->last_name];
+        });
     }
     public function updatingSearch()
     {
@@ -108,6 +119,105 @@ class PendingOrderComponent extends Component
 
     //     return $order;
     // }
+    // public function orders()
+    // {
+    //     $query = Order::with('assignments.employee')->where('status', 0);
+    //     $user = auth()->user();
+
+    //     if ($user->type == 2) {
+    //         $employeeId = $user->employee_id;
+
+    //         $assignedSections = \App\Models\OrderAssignment::where('employee_id', $employeeId)
+    //             ->pluck('section')
+    //             ->toArray();
+
+    //         $query->where(function ($q) use ($employeeId, $assignedSections) {
+    //             $q->whereHas('assignments', fn($q2) => $q2->where('employee_id', $employeeId))
+    //             ->whereIn('current_location', $assignedSections);
+    //         })->orWhere(function ($q) use ($employeeId) {
+    //             $q->whereHas('assignments', fn($q2) => $q2->where('employee_id', $employeeId))
+    //             ->where(function ($inner) {
+    //                 $inner->where('need_sewing', 1)
+    //                         ->orWhere('need_embroidery', 1)
+    //                         ->orWhere('need_imprinting', 1);
+    //             });
+    //         });
+    //     }
+
+    //     // Sorting
+    //     if ($this->sort) {
+    //         $query->orderBy($this->sort, $this->orderBy);
+    //     } else {
+    //         $query->orderByDesc('is_priority')->orderBy('created_at', 'asc');
+    //     }
+
+    //     if ($this->location) {
+    //         $query->where('current_location', $this->location);
+    //     }
+
+    //     if (strlen($this->search) > 3) {
+    //         $query->searchLike(['order_number', 'current_location'], $this->search);
+    //     }
+
+    //     $orders = $query->paginate(20);
+
+      
+
+    //     $employeeCursors = [];
+
+    //     $orders->getCollection()
+    //     ->sortBy([
+    //         fn($o) => $o->is_priority ? 0 : 1,       // priority first
+    //         fn($o) => $o->created_at->timestamp      // earlier created first
+    //     ])
+    //     ->values() // important to reindex after sortBy
+    //     ->transform(function ($order) use (&$employeeCursors) {
+    //         $latestEnd = null;
+
+    //         $incompleteAssignments = $order->assignments->filter(fn($a) => !$a->is_complete);
+
+    //         if ($incompleteAssignments->isEmpty()) {
+    //             $order->expected_delivery = null;
+    //             return $order;
+    //         }
+
+    //         foreach ($incompleteAssignments as $assignment) {
+    //             $employee = $assignment->employee;
+    //             if (!$employee) continue;
+
+    //             $employeeId = $employee->id;
+
+    //             $startHour = Carbon::createFromFormat('H:i:s', $employee->working_hours_start);
+    //             $endHour = Carbon::createFromFormat('H:i:s', $employee->working_hours_end);
+    //             $timePerGarment = CarbonInterval::createFromFormat('H:i:s', $employee->time_per_garment);
+
+    //             if ($timePerGarment->totalSeconds <= 0) continue;
+
+    //             $garments = $assignment->garments_assigned;
+    //             $seconds = $timePerGarment->totalSeconds * $garments;
+
+    //             // Determine start time (respecting last task of this employee)
+    //             $start = $employeeCursors[$employeeId] ?? now();
+    //             $start = $this->normalizeStartTime($start, $startHour, $endHour);
+
+    //             // Calculate end time with working hour logic
+    //             $end = $this->addWorkingTime($start->copy(), $seconds, $startHour, $endHour);
+
+    //             // Update cursor
+    //             $employeeCursors[$employeeId] = $end;
+
+    //             // Track latest end time among all assignments
+    //             if (!$latestEnd || $end->gt($latestEnd)) {
+    //                 $latestEnd = $end;
+    //             }
+    //         }
+
+    //         $order->expected_delivery = $latestEnd;
+    //         return $order;
+    //     });
+
+    //     return $orders;
+    // }
     public function orders()
     {
         $query = Order::with('assignments.employee')->where('status', 0);
@@ -132,7 +242,25 @@ class PendingOrderComponent extends Component
                 });
             });
         }
+            // Internal employee filtering (created_by column)
+            if ($this->internal_employee) {
+                $internalId = ltrim($this->internal_employee, 'emp');
 
+                $query->where(function ($q) use ($internalId) {
+                    $q->where('created_by', $internalId)
+                    ->orWhereHas('logs', function ($logQuery) use ($internalId) {
+                        $logQuery->where('updated_by', $internalId);
+                    });
+                });
+            }
+
+            // External employee filtering via order_assignments
+            if ($this->external_employee) {
+                $externalId = ltrim($this->external_employee, 'emp');
+                $query->whereHas('assignments', function ($q) use ($externalId) {
+                    $q->where('employee_id', $externalId);
+                });
+            }
         // Sorting
         if ($this->sort) {
             $query->orderBy($this->sort, $this->orderBy);
@@ -148,171 +276,182 @@ class PendingOrderComponent extends Component
             $query->searchLike(['order_number', 'current_location'], $this->search);
         }
 
+
+        $startTime = microtime(true);
+
         $orders = $query->paginate(20);
 
-        $orders->getCollection()->transform(function ($order) {
-            $totalSeconds = 0;
-            $cursorTime = now()->copy(); // shared tracker for all assignments in this order
+        $employeeCursors = [];
+
+        $paginatedOrderIds = $orders->pluck('id');
+
+        $fetchStart = microtime(true);
+
+        $allRelevantOrders = Order::with('assignments.employee')
+            ->whereIn('id', $paginatedOrderIds)
+            ->get()
+            ->sortBy([
+                fn($o) => $o->is_priority ? 0 : 1,
+                fn($o) => $o->created_at->timestamp
+            ])
+            ->values();
+
+
+        $calculationStart = microtime(true);
+
+        foreach ($allRelevantOrders as $order) {
+            $incompleteAssignments = $order->assignments->filter(fn($a) => !$a->is_complete);
+            if ($incompleteAssignments->isEmpty()) continue;
+
             $latestEnd = null;
 
-            foreach ($order->assignments as $assignment) {
+            foreach ($incompleteAssignments as $assignment) {
                 $employee = $assignment->employee;
+                if (!$employee) continue;
 
-                if (
-                    !$employee ||
-                    !$employee->working_hours_start || !$employee->working_hours_end ||
-                    !$employee->time_per_garment
-                ) continue;
+                $employeeId = $employee->id;
 
                 $startHour = Carbon::createFromFormat('H:i:s', $employee->working_hours_start);
                 $endHour = Carbon::createFromFormat('H:i:s', $employee->working_hours_end);
                 $timePerGarment = CarbonInterval::createFromFormat('H:i:s', $employee->time_per_garment);
 
-                if ($timePerGarment->totalSeconds <= 0 || $timePerGarment->totalSeconds > 8 * 3600) {
-                    continue; // skip if invalid
-                }
+                if ($timePerGarment->totalSeconds <= 0) continue;
 
                 $garments = $assignment->garments_assigned;
-                $secondsRequired = $timePerGarment->totalSeconds * $garments;
+                $seconds = $timePerGarment->totalSeconds * $garments;
 
-                // Normalize cursor time per assignment
-                $cursorTime = $this->normalizeStartTime($cursorTime, $startHour, $endHour);
-                $endTime = $this->addWorkingTime($cursorTime->copy(), $secondsRequired, $startHour, $endHour);
+                $start = $employeeCursors[$employeeId] ?? now();
+                $start = $this->normalizeStartTime($start, $startHour, $endHour);
 
-                // update shared timer and stats
-                $cursorTime = $endTime->copy();
-                $totalSeconds += $secondsRequired;
+                $end = $this->addWorkingTime($start->copy(), $seconds, $startHour, $endHour);
 
-                if (!$latestEnd || $endTime->gt($latestEnd)) {
-                    $latestEnd = $endTime;
+                $employeeCursors[$employeeId] = $end;
+
+                if (!$latestEnd || $end->gt($latestEnd)) {
+                    $latestEnd = $end;
                 }
             }
 
-            $order->overall_eta = gmdate('H:i:s', $totalSeconds);
-            $order->expected_delivery = $latestEnd ? $latestEnd : null;
+            $order->expected_delivery = $latestEnd;
+        }
 
+
+        $transformStart = microtime(true);
+
+        $orders->getCollection()->transform(function ($order) use ($allRelevantOrders) {
+            $matchingOrder = $allRelevantOrders->firstWhere('id', $order->id);
+            if ($matchingOrder) {
+                $order->expected_delivery = $matchingOrder->expected_delivery;
+            }
             return $order;
         });
 
-        // $globalCursor = now()->copy(); // Shared clock across all orders
 
-        // $orders->getCollection()->transform(function ($order) use (&$globalCursor) {
-        //     $totalSeconds = 0;
-        //     $cursorTime = $globalCursor->copy(); // Independent cursor for this order
-        //     $latestEnd = null;
-
-        //     // Dynamically sort assignments as per their creation (or sequence)
-        //     $sortedAssignments = $order->assignments->sortBy('id'); // or 'created_at'
-
-        //     foreach ($sortedAssignments as $assignment) {
-        //         $employee = $assignment->employee;
-
-        //         if (
-        //             !$employee ||
-        //             !$employee->working_hours_start || !$employee->working_hours_end ||
-        //             !$employee->time_per_garment
-        //         ) continue;
-
-        //         $startHour = Carbon::createFromFormat('H:i:s', $employee->working_hours_start);
-        //         $endHour = Carbon::createFromFormat('H:i:s', $employee->working_hours_end);
-        //         $timePerGarment = CarbonInterval::createFromFormat('H:i:s', $employee->time_per_garment);
-
-        //         if ($timePerGarment->totalSeconds <= 0 || $timePerGarment->totalSeconds > 8 * 3600) {
-        //             continue;
-        //         }
-
-        //         $garments = $assignment->garments_assigned;
-        //         $secondsRequired = $timePerGarment->totalSeconds * $garments;
-
-        //         // Normalize and calculate ETA for this assignment
-        //         $cursorTime = $this->normalizeStartTime($cursorTime, $startHour, $endHour);
-        //         $endTime = $this->addWorkingTime($cursorTime->copy(), $secondsRequired, $startHour, $endHour);
-
-        //         // Update per-assignment timer
-        //         $cursorTime = $endTime->copy();
-        //         $totalSeconds += $secondsRequired;
-
-        //         // Update order-wide latest end time
-        //         if (!$latestEnd || $endTime->gt($latestEnd)) {
-        //             $latestEnd = $endTime;
-        //         }
-        //     }
-
-        //     // Priority orders reserve their delivery window earlier
-        //     if ($order->is_priority) {
-        //         $globalCursor = $cursorTime->copy();
-        //     }
-
-        //     $order->overall_eta = gmdate('H:i:s', $totalSeconds);
-        //     $order->expected_delivery = $latestEnd;
-
-        //     return $order;
-        // });
-
+        $endTime = microtime(true);
 
         return $orders;
+
+
     }
 
-    protected function isWeekend(Carbon $date)
+    private function normalizeStartTime($start, $startHour, $endHour)
     {
-        return $date->isSaturday() || $date->isSunday();
-    }
-
-    protected function normalizeStartTime(Carbon $dateTime, Carbon $startHour, Carbon $endHour)
-    {
-        if ($this->isWeekend($dateTime)) {
-            $dateTime->addDay();
-            while ($this->isWeekend($dateTime)) {
-                $dateTime->addDay();
-            }
-            return $dateTime->setTimeFrom($startHour);
+        $startTime = $start->copy()->setTimeFrom($startHour);
+        $endTime = $start->copy()->setTimeFrom($endHour);
+        
+        // If start is before working hours, move to start of working hours
+        if ($start->lt($startTime)) {
+            return $startTime;
         }
-
-        $workStart = $dateTime->copy()->setTimeFrom($startHour);
-        $workEnd = $dateTime->copy()->setTimeFrom($endHour);
-
-        if ($dateTime->lt($workStart)) return $workStart;
-        if ($dateTime->gte($workEnd)) {
-            $dateTime->addDay();
-            while ($this->isWeekend($dateTime)) {
-                $dateTime->addDay();
-            }
-            return $dateTime->setTimeFrom($startHour);
+        
+        // If start is after working hours, move to next day's start
+        if ($start->gt($endTime)) {
+            return $startTime->addDay();
         }
-
-        return $dateTime;
+        
+        return $start;
     }
 
-    protected function addWorkingTime(Carbon $start, $seconds, Carbon $startHour, Carbon $endHour)
+    // public function addWorkingTime(Carbon $start, int $secondsToAdd, Carbon $startHour, Carbon $endHour): Carbon
+    // {
+    //     $current = $start->copy();
+
+    //     while ($secondsToAdd > 0) {
+    //         if ($current->isSunday()) {
+    //             $current->addDay()->setTimeFrom($startHour);
+    //             continue;
+    //         }
+
+    //         $workDayStart = $current->copy()->setTimeFrom($startHour);
+    //         $workDayEnd = $current->copy()->setTimeFrom($endHour);
+
+    //         // If before work hours, start at work start
+    //         if ($current->lt($workDayStart)) {
+    //             $current = $workDayStart;
+    //         }
+
+    //         // If after work hours, skip to next day
+    //         if ($current->gte($workDayEnd)) {
+    //             $current->addDay()->setTimeFrom($startHour);
+    //             continue;
+    //         }
+
+    //         // Calculate available time today
+    //         $availableToday = $workDayEnd->diffInSeconds($current);
+
+    //         $secondsToWork = min($availableToday, $secondsToAdd);
+    //         $current->addSeconds($secondsToWork);
+    //         $secondsToAdd -= $secondsToWork;
+    //     }
+
+    //     return $current;
+    // }
+    public function addWorkingTime(Carbon $start, int $secondsToAdd, Carbon $startHour, Carbon $endHour): Carbon
     {
+        $workDaySeconds = $endHour->diffInSeconds($startHour);
         $current = $start->copy();
-        $remaining = $seconds;
 
-        while ($remaining > 0) {
-            if ($this->isWeekend($current)) {
+        while ($secondsToAdd > 0) {
+            // Skip Sundays
+            if ($current->isSunday()) {
                 $current->addDay()->setTimeFrom($startHour);
                 continue;
             }
 
-            $endOfDay = $current->copy()->setTimeFrom($endHour);
-            $available = $current->diffInSeconds($endOfDay);
-            $consume = min($available, $remaining);
+            $workDayStart = $current->copy()->setTimeFrom($startHour);
+            $workDayEnd = $current->copy()->setTimeFrom($endHour);
 
-            $current->addSeconds($consume);
-            $remaining -= $consume;
-
-            if ($remaining > 0) {
-                $current->addDay()->setTimeFrom($startHour);
-                while ($this->isWeekend($current)) {
-                    $current->addDay();
-                }
+            // If before working hours, move to workDayStart
+            if ($current->lt($workDayStart)) {
+                $current = $workDayStart;
             }
+
+            // If after working hours, go to next workday
+            if ($current->gte($workDayEnd)) {
+                $current->addDay()->setTimeFrom($startHour);
+                continue;
+            }
+
+            // Seconds left today
+            $availableToday = $workDayEnd->diffInSeconds($current);
+
+            if ($secondsToAdd <= $availableToday) {
+                return $current->addSeconds($secondsToAdd); // done
+            }
+
+            // Use up the day, go to next day
+            $secondsToAdd -= $availableToday;
+            $current = $current->copy()->addDay()->setTimeFrom($startHour);
         }
 
         return $current;
     }
 
 
+    protected function isWeekend(Carbon $date)
+    {
+        return $date->isSaturday() || $date->isSunday();
+    }
 
     public function sortData($sort, $orderBy)
     {
@@ -320,17 +459,15 @@ class PendingOrderComponent extends Component
         $this->sort  = $sort;
     }
    public function render()
-{
-    $this->dispatch('sticky-header'); 
-    return view('livewire.order.pending-order-component', [
-        'orders' => $this->orders()
-    ]);
-}
+    {
+        $this->dispatch('sticky-header'); 
+        return view('livewire.order.pending-order-component', [
+            'orders' => $this->orders()
+        ]);
+    }
 
     public function updateSweing($status, $orderId, $updated_by)
     {
-
-        
         $numbersOnly = preg_replace("/[^0-9]/", "", $orderId);
         $order = Order::find($numbersOnly);  
         ////
@@ -418,10 +555,16 @@ class PendingOrderComponent extends Component
             $order->sewing_progress =  1;
             $order->update();
             $msg = "in process";
+            OrderAssignment::where('order_id', $order->id)
+            ->where('section', 'Sewing')
+            ->update([
+                'is_progress' => 1,
+            ]);
         }
         else
         {
             $msg = "Unfinished";
+            
         }
         OrderLog::forceCreate([
             'title' => "Sewing mark as $msg",
@@ -437,8 +580,14 @@ class PendingOrderComponent extends Component
                 'status' => 0,
             ]);
         }
+        
         else
         {
+             OrderAssignment::where('order_id', $order->id)
+            ->where('section', 'Sewing')
+            ->update([
+                'is_progress' => 0,
+            ]);
             OrderTrack::where('order_id', $order->id)->where('type', 1)->delete();
             $order->need_sewing = 2;
             $order->sewing_progress = 0;
@@ -535,6 +684,11 @@ class PendingOrderComponent extends Component
             $order->embroidery_progress =  1;
             $order->update();
             $msg = "in process";
+             OrderAssignment::where('order_id', $order->id)
+            ->where('section', 'Embroidery')
+            ->update([
+                'is_progress' => 1,
+            ]);
         }
         else
         {
@@ -556,6 +710,11 @@ class PendingOrderComponent extends Component
         }
         else
         {
+            OrderAssignment::where('order_id', $order->id)
+            ->where('section', 'Embroidery')
+            ->update([
+                'is_progress' => 0,
+            ]);
             OrderTrack::where('order_id', $order->id)->where('type', 2)->delete();
             $order->need_embroidery = 2;
             $order->embroidery_progress = 0;
@@ -644,6 +803,11 @@ class PendingOrderComponent extends Component
             $order->imprinting_progress =  1;
             $order->update();
             $msg = "in process";
+            OrderAssignment::where('order_id', $order->id)
+            ->where('section', 'Imprinting')
+            ->update([
+                'is_progress' => 1,
+            ]);
         }
         else
         {
@@ -665,6 +829,11 @@ class PendingOrderComponent extends Component
         }
         else
         {
+             OrderAssignment::where('order_id', $order->id)
+            ->where('section', 'Imprinting')
+            ->update([
+                'is_progress' => 0,
+            ]);
             OrderTrack::where('order_id', $order->id)->where('type', 3)->delete();
             $order->need_imprinting = 2;
             $order->imprinting_progress = 0;
@@ -674,6 +843,11 @@ class PendingOrderComponent extends Component
     public function updateLocation($orderId, $updated_by, $selectedText)
     {
         $order = Order::find($orderId);
+        if($order){
+            $order->assignments()->update([
+            'location' => null,
+            ]);
+        }
         $location = $order->current_location;
         $order->current_location=$selectedText;
         $order->update();
