@@ -22,10 +22,9 @@ class ExternalPendingOrderComponent extends Component
 {  
     use WithPagination;
     #[Url] 
-    public $search;
-    #[Url] 
+    public $search; 
     public $orderLocations = [];
-    protected $queryString = ['search', 'location'];
+    protected $queryString = ['search'];
     protected $paginationTheme = 'bootstrap';
     public $need_sewing;
     public $by_user;
@@ -65,102 +64,95 @@ class ExternalPendingOrderComponent extends Component
     {
         $this->resetPage();
     }
-    // public function updatedOrderLocations($value, $key)
-    // {
-    //     $orderId = $key;
-    //     $employeeId = auth()->user()->employee_id;
-
-    //     $assignment = OrderAssignment::where('order_id', $orderId)
-    //         ->where('employee_id', $employeeId)
-    //         ->first();
-
-    //     if ($assignment) {
-    //         $assignment->location = $value;
-    //         $assignment->save();
-    //     }
-    // }
-    // public function updatedOrderLocations($value, $key) 
-    // {
-    //     $orderId = $key;
-    //     $employeeId = auth()->user()->employee_id;
-
-    //     $assignment = OrderAssignment::where('order_id', $orderId)
-    //         ->where('employee_id', $employeeId)
-    //         ->first();
-
-    //     if ($assignment && $assignment->location !== $value) {
-    //         // Try to find the matching next section assignment (handover)
-    //         $nextEmployeeAssignment = OrderAssignment::where('order_id', $assignment->order_id)
-    //             ->where('section', $value)
-    //             ->where('garments_assigned', $assignment->garments_assigned)
-    //             ->first();
-
-    //         $assignment->location = $value;
-    //         $assignment->save();
-
-    //         if ($nextEmployeeAssignment && $nextEmployeeAssignment->employee) {
-    //             $order = Order::find($orderId);
-    //             $nextEmpName = $nextEmployeeAssignment->employee->first_name ?? 'Another Employee';
-    //             $orderNumber = $order?->order_number ?? 'Unknown';
-
-    //             session()->flash('message', "Order #{$orderNumber} is handed over to {$nextEmpName}.");
-    //         } else {
-    //             session()->flash('message', 'Location updated.');
-    //         }
-    //     }
-    // }
     public function updatedOrderLocations($value, $key)
-{
-    $orderId = $key;
-    $employeeId = auth()->user()->employee_id;
+    {
+        $orderId = $key;
+        $employeeId = auth()->user()->employee_id;
 
-    $assignment = OrderAssignment::where('order_id', $orderId)
-        ->where('employee_id', $employeeId)
-        ->first();
-
-    if ($assignment && $assignment->location !== $value) {
-        // Save updated location
-        $assignment->location = $value;
-        $assignment->save();
-
-        // ✅ Check if all employees in the same section completed and selected the same location
-        $sectionAssignments = OrderAssignment::where('order_id', $orderId)
-            ->where('section', $assignment->section)
-            ->get();
-
-        $allCompleted = $sectionAssignments->every(fn ($a) => $a->is_complete == 1);
-        $uniqueLocations = $sectionAssignments->pluck('location')->filter()->unique();
-
-        if ($allCompleted && $uniqueLocations->count() === 1) {
-            // All done + all same location → update order's main current_location
-            Order::where('id', $orderId)->update([
-                'current_location' => $uniqueLocations->first(),
-            ]);
-        }
-
-        // ✅ Handover logic remains
-        $nextEmployeeAssignment = OrderAssignment::where('order_id', $assignment->order_id)
-            ->where('section', $value)
-            ->where('garments_assigned', $assignment->garments_assigned)
+        $assignment = OrderAssignment::where('order_id', $orderId)
+            ->where('employee_id', $employeeId)
             ->first();
 
-        if ($nextEmployeeAssignment && $nextEmployeeAssignment->employee) {
-            $order = Order::find($orderId);
-            $nextEmpName = $nextEmployeeAssignment->employee->first_name ?? 'Another Employee';
-            $orderNumber = $order?->order_number ?? 'Unknown';
+        if ($assignment && $assignment->location !== $value) {
+            // Save updated location
+            $assignment->location = $value;
+            $assignment->where('order_id', $orderId)->where('section', $value)->where('garments_assigned', $assignment->garments_assigned)->update(['location' => null]);
+            $assignment->save();
 
-            session()->flash('message', "Order #{$orderNumber} is handed over to {$nextEmpName}.");
-        } else {
-            session()->flash('message', 'Location updated.');
+           //Yakki
+           $order = Order::where('id', $orderId)->first();
+
+        //    dd($order->number_of_garments);
+            if ( $assignment
+            ->where('order_id', $orderId)
+            ->where('location', 'Sewing')
+            ->sum('garments_assigned') == $order->number_of_garments
+                ) {
+                    $order->current_location = 'Sewing';
+                    $order->save();
+                }
+
+
+                
+ if ( $assignment
+            ->where('order_id', $orderId)
+            ->where('location', 'Embroidery')
+            ->sum('garments_assigned') == $order->number_of_garments
+                ) {
+                    $order->current_location = 'Embroidery';
+                    $order->save();
+                }
+
+                if ( $assignment
+            ->where('order_id', $orderId)
+            ->where('location', 'Imprinting')
+            ->sum('garments_assigned') == $order->number_of_garments
+                ) {
+                    $order->current_location = 'Imprinting';
+                    $order->save();
+                }
+
+            // ✅ Check if all employees in the same section completed and selected the same location
+            $sectionAssignments = OrderAssignment::where('order_id', $orderId)
+                ->where('section', $assignment->section)
+                ->get();
+
+            $allCompleted = $sectionAssignments->every(fn ($a) => $a->is_complete == 1);
+            $uniqueLocations = $sectionAssignments->pluck('location')->filter()->unique();
+
+            if ($allCompleted && $uniqueLocations->count() === 1) {
+                // All done + all same location → update order's main current_location
+                Order::where('id', $orderId)->update([
+                    'current_location' => $uniqueLocations->first(),
+                ]);
+            }
+
+            // ✅ Handover logic remains
+            $nextEmployeeAssignment = OrderAssignment::where('order_id', $assignment->order_id)
+                ->where('section', $value)
+                ->where('garments_assigned', $assignment->garments_assigned)
+                ->first();
+
+            if ($nextEmployeeAssignment && $nextEmployeeAssignment->employee) {
+                $order = Order::find($orderId);
+                $nextEmpName = $nextEmployeeAssignment->employee->first_name ?? 'Another Employee';
+                $orderNumber = $order?->order_number ?? 'Unknown';
+
+                session()->flash('message', "Order #{$orderNumber} is handed over to {$nextEmpName}.");
+            } else {
+                session()->flash('message', 'Location updated.');
+            }
+             $allAssignments = OrderAssignment::where('order_id', $orderId)->get();
+                $allDone = $allAssignments->every(fn ($a) => $a->is_complete == 1);
+
+                if ($allDone) {
+                    Order::where('id', $orderId)->update([
+                        'status' => 1, // ✅ Mark as ready
+                    ]);
+                }
         }
     }
-}
-
-
-
-
-
-
+   
     public function orders()
     {
         $user = auth()->user();
@@ -170,87 +162,70 @@ class ExternalPendingOrderComponent extends Component
             ->where('status', 0)
             ->with('assignments');
 
-        // if ($user->type == 2 && $employeeId) {
-        //     // Get all assignments for current employee
-        //     $myAssignments = OrderAssignment::where('employee_id', $employeeId)->get();
-
-        //     $query->whereHas('assignments', fn($q) => $q->where('employee_id', $employeeId))
-        //         ->where(function ($q) use ($myAssignments) {
-        //             foreach ($myAssignments as $assign) {
-        //                 $order = Order::find($assign->order_id);
-        //                 if (!$order) continue;
-
-        //                 // 🚫 Skip if assignment is completed and location is not same (handover)
-        //                 if ($assign->is_complete && $assign->location && $assign->location !== $assign->section) {
-        //                     continue;
-        //                 }
-
-        //                 $q->orWhere(function ($sub) use ($assign, $order) {
-        //                     $prevSection = $this->getPreviousSection($assign->section, $order);
-
-        //                     if (!$prevSection) {
-        //                         $sub->where('id', $assign->order_id);
-        //                     } else {
-        //                         $currentAssignments = $this->getSectionAssignments($order, $assign->section);
-        //                         $prevAssignments = $this->getSectionAssignments($order, $prevSection);
-
-        //                         $index = $currentAssignments->search(fn($a) => $a->id === $assign->id);
-
-        //                         if ($index !== false && isset($prevAssignments[$index])) {
-        //                             $prev = $prevAssignments[$index];
-        //                             if (
-        //                                 $prev->is_complete &&
-        //                                 $prev->garments_assigned === $assign->garments_assigned &&
-        //                                 $assign->section === $prev->location
-        //                             ) {
-        //                                 $sub->where('id', $assign->order_id);
-        //                             }
-        //                         }
-        //                     }
-        //                 });
-        //             }
-
-        //         });
-        // }
+      
         if ($user->type == 2 && $employeeId) {
             $myAssignments = OrderAssignment::where('employee_id', $employeeId)->get();
 
             $query->whereHas('assignments', fn($q) => $q->where('employee_id', $employeeId));
 
-            $query->where(function ($q) use ($myAssignments) {
-                foreach ($myAssignments as $assign) {
-                    $order = Order::find($assign->order_id);
-                    if (!$order) continue;
+            $query->where(function ($q) use ($myAssignments, $employeeId) {
+                    foreach ($myAssignments as $assign) {
+                        $order = Order::find($assign->order_id);
+                        if (!$order) continue;
 
-                    // ✅ CASE 1: Assigned in current location section & not complete yet
-                    if (
-                        $order->current_location === $assign->section &&
-                        !$assign->is_complete
-                    ) {
-                        $q->orWhere('id', $order->id);
-                        continue;
+                        // Get related assignments for this order
+                        $related = $order->assignments;
+
+                        // Check if user changed location
+                        $userChangedLocation = !is_null($assign->location) && $assign->location !== $assign->section;
+
+                        // CASE: Both employees swapped locations and both are incomplete
+                        $swapped = $related->first(function ($a) use ($assign, $employeeId) {
+                            return $a->employee_id !== $employeeId &&
+                                $a->section === $assign->location && // his section = my location
+                                $a->location === $assign->section && // his location = my section
+                                $a->garments_assigned === $assign->garments_assigned &&
+                                !$a->is_complete;
+                        });
+
+                        if ($userChangedLocation && !$assign->is_complete && $swapped) {
+                            $q->orWhere('id', $order->id); // ✅ show to both sides
+                            continue;
+                        }
+
+                        // CASE: Employee's section matches current location and location not changed
+                        if (
+                            is_null($assign->location) &&
+                            $order->current_location === $assign->section &&
+                            !$assign->is_complete
+                        ) {
+                            $q->orWhere('id', $order->id);
+                            continue;
+                        }
+
+                        // CASE: Someone handed off the order to me (one-way)
+                        $handoverToMe = $related->first(function ($a) use ($assign, $employeeId) {
+                            return $a->employee_id !== $employeeId &&
+                                $a->location === $assign->section &&
+                                $a->garments_assigned === $assign->garments_assigned &&
+                                !$a->is_complete;
+                        });
+
+                        if ($handoverToMe && !$assign->is_complete) {
+                            $q->orWhere('id', $order->id);
+                            continue;
+                        }
+
+                        // Optionally: allow viewing completed if still in same section
+                        if ($assign->is_complete && is_null($assign->location) && $order->current_location === $assign->section) {
+                            $q->orWhere('id', $order->id);
+                            continue;
+                        }
+
+                        // ❌ Default: skip everything else
                     }
-
-                    // ✅ CASE 2: Always show if the employee already completed it
-                    if ($assign->is_complete) {
-                        $q->orWhere('id', $order->id);
-                        continue;
-                    }
-
-                    // ✅ CASE 3: Handed over from previous section (employee not done yet)
-                    $handoverAssignments = $order->assignments
-                        ->where('location', $assign->section)
-                        ->where('is_complete', 1)
-                        ->where('garments_assigned', $assign->garments_assigned);
-
-                    if ($handoverAssignments->count() && !$assign->is_complete) {
-                        $q->orWhere('id', $order->id);
-                    }
-                }
-            });
+                });
         }
-
-
         // 📊 Filters
         if ($this->sort) {
             $query->orderBy($this->sort, $this->orderBy ?? 'asc');
@@ -287,9 +262,9 @@ class ExternalPendingOrderComponent extends Component
                 foreach ($assignments as $assignment) {
                     if ($assignment->is_complete) continue;
 
-                    if (!$this->hasCorrectSequentialDependency($order, $assignment)) {
-                        continue;
-                    }
+                    // if (!$this->hasCorrectSequentialDependency($order, $assignment)) {
+                    //     continue;
+                    // }
 
                     $eta = $cursorTime->copy();
                     $totalSeconds = $timePerGarment->totalSeconds * $assignment->garments_assigned;
@@ -463,68 +438,75 @@ class ExternalPendingOrderComponent extends Component
         }
 
         // ✅ If marked complete, check if all in section are complete
-        // if ($completionChanged && $order) {
-        //     $allCompleteInSection = OrderAssignment::where('order_id', $orderId)
-        //         ->where('section', $stage)
-        //         ->where('is_complete', 0)
-        //         ->doesntExist(); // No incomplete = all complete in this section
+       if ($completionChanged && $order) {
+            $allCompleteInSection = OrderAssignment::where('order_id', $orderId)
+                ->where('section', $stage)
+                ->where('is_complete', 0)
+                ->doesntExist();
 
-        //     if ($allCompleteInSection) {
-        //         $needField = 'need_' . strtolower($stage);
-        //         if (in_array($needField, ['need_sewing', 'need_embroidery', 'need_imprinting'])) {
-        //             $order->$needField = 1;
-        //         }
-        //     }
-        // }
-
-        if ($order) {
-            $needField = 'need_' . strtolower($stage);
-            if (in_array($needField, ['need_sewing', 'need_embroidery', 'need_imprinting'])) {
-                $allCompleteInSection = OrderAssignment::where('order_id', $orderId)
-                    ->where('section', $stage)
-                    ->where('is_complete', 0)
-                    ->doesntExist();
-
-                $order->$needField = $allCompleteInSection ? 1 : 2;
+            if ($allCompleteInSection) {
+                $needField = 'need_' . strtolower($stage);
+                if (in_array($needField, ['need_sewing', 'need_embroidery', 'need_imprinting'])) {
+                    $order->$needField = 1;
+                }
             }
         }
 
+        // Always ensure progress field is updated
+        if ($order) {
+            // Determine applicable sections based on assignments
+            $sectionsWithAssignments = OrderAssignment::where('order_id', $order->id)
+                ->select('section')
+                ->distinct()
+                ->pluck('section')
+                ->map(fn ($section) => strtolower($section))
+                ->toArray();
 
-       if (isset($order)) {
-    // ✅ Check if ALL assignments for this order are complete
-    $allAssignmentsComplete = OrderAssignment::where('order_id', $order->id)
-        ->where('is_complete', 0)
-        ->doesntExist(); // No incomplete assignments at all
+            $sectionNeedFields = [
+                'sewing' => 'need_sewing',
+                'embroidery' => 'need_embroidery',
+                'imprinting' => 'need_imprinting',
+            ];
 
-    // ✅ Proceed only if all sections are required AND all assignments are complete
-    if (
-        $allAssignmentsComplete &&
-        $order->need_sewing == 1 &&
-        $order->need_embroidery == 1 &&
-        $order->need_imprinting == 1
-    ) {
-        $order->status = 1;
+            // Only include sections that actually have assignments
+            $requiredSections = collect($sectionNeedFields)
+                ->only($sectionsWithAssignments)
+                ->all();
 
-        $order->assignments->each(function ($assignment) {
-            $assignment->is_complete = 1;
-            $assignment->is_progress = 1;
-            $assignment->save();
-        });
+            // Check if all assignments are complete
+            $allAssignmentsComplete = OrderAssignment::where('order_id', $order->id)
+                ->where('is_complete', 0)
+                ->doesntExist();
 
-        session()->flash('message', "Order #{$order->order_number} is now ready.");
-    }
+            // Check if all required `need_*` fields are set to 1
+            $allRequiredSectionsDone = collect($requiredSections)->every(function ($field) use ($order) {
+                return $order->$field == 1;
+            });
 
-    $order->save();
-}
+            // \Log::info("Checking Order {$order->order_number} → Required Sections: " . json_encode($requiredSections));
+            // \Log::info("AllComplete: {$allAssignmentsComplete} | AllSectionsDone: {$allRequiredSectionsDone}");
 
+            if ($allAssignmentsComplete && $allRequiredSectionsDone) {
+                $order->status = 1;
+
+                $order->load('assignments');
+                $order->assignments->each(function ($assignment) {
+                    $assignment->is_complete = 1;
+                    $assignment->is_progress = 1;
+                    $assignment->save();
+                });
+
+                session()->flash('message', "Order #{$order->order_number} is now ready.");
+            }
+
+            $order->save();
+        }
 
         $this->confirmingStageUpdate = false;
 
         // ✅ Update stage if needed
         // $this->checkAndAdvanceOrderStage($orderId);
     }
-
-
 
     public function checkAndAdvanceOrderStage($orderId)
     {
@@ -566,9 +548,6 @@ class ExternalPendingOrderComponent extends Component
         $order->save();
     }
 
-
-
-  
     public function sortData($sort, $orderBy)
     {
         $this->orderBy = $orderBy;

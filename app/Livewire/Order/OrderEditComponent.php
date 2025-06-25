@@ -211,7 +211,27 @@ class OrderEditComponent extends Component
 
             $totalSteps = $required->filter(fn($val) => (int) $val > 0)->count();
             $readySteps = $required->filter(fn($val) => (int) $val === 1)->count();
+            if($this->current_location != $order->current_location) {
+                 $order->assignments()->update([
+                    'location' => null,
+                    ]);
+            }
+             if ($order->current_location === 'Imprinting' && $this->need_imprinting != 1) {
+                $this->addError('location', 'Please select current location');
+                return false;
+            }
 
+            // Sewing check
+            if ($order->current_location === 'Sewing' && $this->need_sewing != 1) {
+                $this->addError('location', 'Please select current location');
+                return false;
+            }
+
+            // Embroidery check
+            if ($order->current_location === 'Embroidery' && $this->need_embroidery != 1) {
+                $this->addError('location', 'Please select current location');
+                return false;
+            }
             $afterUpdateOrder->status = ($totalSteps > 0 && $readySteps === $totalSteps) ? 1 : 0;
             $afterUpdateOrder->save();
 
