@@ -190,7 +190,13 @@ class ExternalEmployee extends Component
 
     public function deleteRecord($id)
     {
-        ModelsEmployee::where('type', 2)->findOrFail($id)->update([
+        $employee = ModelsEmployee::where('id', $id)->where('type', 2)->first();
+
+        if (!$employee) {
+            abort(404, 'Employee not found or not of type 2');
+        }
+
+        $employee->update([
             'is_delete' => 1
         ]);
     }

@@ -1,6 +1,17 @@
 <div class="container-fluid p-0">
     <div class="row">
         <div class="col-12">
+            @if (!empty($overallEtaBreakdown) && !empty($overallEtaBreakdown['readable']) && !empty($overallEtaBreakdown['date']))
+                <div class="d-flex justify-content-end mb-4">
+                    <div class="d-inline-flex align-items-center gap-2 shadow-sm px-3 py-2 bg-opacity-25 rounded-pill">
+                        <i class="fa-solid fa-clock text-warning fs-5"></i>
+                        <span class="text-dark fw-semibold small">Current Lead Time:</span>
+                        <span class="fw-semibold px-3 py-1 bg-warning text-dark rounded-pill">
+                            {{ $overallEtaBreakdown['readable'] }} — {{ $overallEtaBreakdown['date'] }}
+                        </span>
+                    </div>
+                </div>
+            @endif
             <div class="card mb-4">
                 <div class="card-header pb-0">
                     <div class="row">

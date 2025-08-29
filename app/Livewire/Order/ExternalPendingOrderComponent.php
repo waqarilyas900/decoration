@@ -74,10 +74,23 @@ class ExternalPendingOrderComponent extends Component
             ->first();
 
         if ($assignment && $assignment->location !== $value) {
+             $oldLocation = OrderAssignment::where('order_id', $orderId)
+                ->where('employee_id', $employeeId)
+                ->where('section', $assignment->section)
+                ->value('section');
+
             // Save updated location
             $assignment->location = $value;
+            //Log
+             OrderLog::forceCreate([
+                    'title' => "Location changed from {$oldLocation} to {$value}",
+                    'updated_by' => $employeeId,
+                    'order_id' => $orderId,
+                ]);
             $assignment->where('order_id', $orderId)->where('section', $value)->where('garments_assigned', $assignment->garments_assigned)->update(['location' => null]);
             $assignment->save();
+
+             
 
            //Yakki
            $order = Order::where('id', $orderId)->first();
@@ -94,7 +107,7 @@ class ExternalPendingOrderComponent extends Component
 
 
                 
- if ( $assignment
+        if ( $assignment
             ->where('order_id', $orderId)
             ->where('location', 'Embroidery')
             ->sum('garments_assigned') == $order->number_of_garments
@@ -153,170 +166,325 @@ class ExternalPendingOrderComponent extends Component
         }
     }
    
+    // public function orders()
+    // {
+    //     $user = auth()->user();
+    //     $employeeId = $user->employee_id ?? null;
+
+    //     $query = Order::query()
+    //         ->where('status', 0)
+    //         ->with('assignments');
+
+      
+    //     if ($user->type == 2 && $employeeId) {
+    //         $myAssignments = OrderAssignment::where('employee_id', $employeeId)->get();
+
+    //         $query->whereHas('assignments', fn($q) => $q->where('employee_id', $employeeId));
+
+    //         $query->where(function ($q) use ($myAssignments, $employeeId) {
+    //                 foreach ($myAssignments as $assign) {
+    //                     $order = Order::find($assign->order_id);
+    //                     if (!$order) continue;
+
+    //                     // Get related assignments for this order
+    //                     $related = $order->assignments;
+
+    //                     // Check if user changed location
+    //                     $userChangedLocation = !is_null($assign->location) && $assign->location !== $assign->section;
+
+    //                     // CASE: Both employees swapped locations and both are incomplete
+    //                     $swapped = $related->first(function ($a) use ($assign, $employeeId) {
+    //                         return $a->employee_id !== $employeeId &&
+    //                             $a->section === $assign->location && // his section = my location
+    //                             $a->location === $assign->section && // his location = my section
+    //                             $a->garments_assigned === $assign->garments_assigned &&
+    //                             !$a->is_complete;
+    //                     });
+
+    //                     if ($userChangedLocation && !$assign->is_complete && $swapped) {
+    //                         $q->orWhere('id', $order->id); // ✅ show to both sides
+    //                         continue;
+    //                     }
+
+    //                     // CASE: Employee's section matches current location and location not changed
+    //                     if (
+    //                         is_null($assign->location) &&
+    //                         $order->current_location === $assign->section &&
+    //                         !$assign->is_complete
+    //                     ) {
+    //                         $q->orWhere('id', $order->id);
+    //                         continue;
+    //                     }
+
+    //                     // CASE: Someone handed off the order to me (one-way)
+    //                     $handoverToMe = $related->first(function ($a) use ($assign, $employeeId) {
+    //                         return $a->employee_id !== $employeeId &&
+    //                             $a->location === $assign->section &&
+    //                             $a->garments_assigned === $assign->garments_assigned &&
+    //                             !$a->is_complete;
+    //                     });
+
+    //                     if ($handoverToMe && !$assign->is_complete) {
+    //                         $q->orWhere('id', $order->id);
+    //                         continue;
+    //                     }
+
+    //                     // Optionally: allow viewing completed if still in same section
+    //                     if ($assign->is_complete && is_null($assign->location) && $order->current_location === $assign->section) {
+    //                         $q->orWhere('id', $order->id);
+    //                         continue;
+    //                     }
+
+    //                     // ❌ Default: skip everything else
+    //                 }
+    //             });
+    //     }
+    //     // 📊 Filters
+    //     if ($this->sort) {
+    //         $query->orderBy($this->sort, $this->orderBy ?? 'asc');
+    //     } else {
+    //         $query->orderByDesc('is_priority')->orderBy('created_at', 'asc');
+    //     }
+
+    //    if ($user->type == 2 && $this->locationFilter) {
+    //         $query->whereHas('assignments', function ($q) use ($employeeId) {
+    //             $q->where('employee_id', $employeeId)
+    //             ->where('location', $this->locationFilter);
+    //         });
+    //     }
+
+    //     if (strlen($this->search) > 3) {
+    //         $query->searchLike(['order_number', 'current_location'], $this->search);
+    //     }
+
+    //    $allOrderIds = (clone $query)->pluck('id')->toArray();
+
+    //     // 2. Paginate the query
+    //     $perPage = 20;
+    //     $orders = $query->paginate($perPage);
+
+    //     // 3. Calculate ETA for all orders in order
+    //     if ($user->type == 2 && $employeeId) {
+    //         $employee = $user->employee;
+    //         $startHour = Carbon::createFromFormat('H:i:s', $employee->working_hours_start);
+    //         $endHour = Carbon::createFromFormat('H:i:s', $employee->working_hours_end);
+    //         $timePerGarment = CarbonInterval::createFromFormat('H:i:s', $employee->time_per_garment);
+    //         $cursorTime = $this->normalizeStartTime(Carbon::now(), $startHour, $endHour);
+
+    //         // Loop through all filtered order IDs in order
+    //         foreach ($allOrderIds as $orderId) {
+    //             // Find order in current page collection if present
+    //             $order = $orders->getCollection()->firstWhere('id', $orderId);
+    //             // Or fetch from DB if not in current page (for ETA calculation only)
+    //             if (!$order) {
+    //                 $order = Order::with('assignments')->find($orderId);
+    //             }
+    //             if (!$order) continue;
+
+    //             $assignments = $order->assignments
+    //                 ->where('employee_id', $employeeId)
+    //                 ->sortBy(fn($a) => $this->getSectionPriority($a->section));
+
+    //             foreach ($assignments as $assignment) {
+    //                 if ($assignment->is_complete) continue;
+
+    //                 $eta = $cursorTime->copy();
+    //                 $totalSeconds = $timePerGarment->totalSeconds * $assignment->garments_assigned;
+    //                 $eta = $this->normalizeStartTime($eta, $startHour, $endHour);
+
+    //                 $secondsLeft = $totalSeconds;
+    //                 while ($secondsLeft > 0) {
+    //                     if ($this->isWeekend($eta)) {
+    //                         $eta->addDay()->setTimeFrom($startHour);
+    //                         continue;
+    //                     }
+
+    //                     $endOfDay = $eta->copy()->setTimeFrom($endHour);
+    //                     $available = $eta->diffInSeconds($endOfDay);
+    //                     $consume = min($available, $secondsLeft);
+
+    //                     $eta->addSeconds($consume);
+    //                     $secondsLeft -= $consume;
+
+    //                     if ($secondsLeft > 0) {
+    //                         $eta->addDay()->setTimeFrom($startHour);
+    //                         while ($this->isWeekend($eta)) {
+    //                             $eta->addDay();
+    //                         }
+    //                     }
+    //                 }
+
+    //                 // Only set eta_data for orders on the current page
+    //                 if ($orders->getCollection()->contains('id', $order->id)) {
+    //                     $order->eta_data = [
+    //                         'section' => $assignment->section,
+    //                         'garments' => $assignment->garments_assigned,
+    //                         'total_time' => gmdate('H:i:s', $totalSeconds),
+    //                         'expected_delivery' => $eta->toDateTimeString(),
+    //                     ];
+    //                 }
+
+    //                 $cursorTime = $eta->copy();
+    //                 break;
+    //             }
+    //         }
+    //     }
+
+    //     return $orders;
+    // }
     public function orders()
     {
         $user = auth()->user();
         $employeeId = $user->employee_id ?? null;
 
-        $query = Order::query()
-            ->where('status', 0)
-            ->with('assignments');
+        // STEP 1: Build visible query (search, filters, visibility)
+        $query = Order::query()->where('status', 0)->with('assignments');
 
-      
-        if ($user->type == 2 && $employeeId) {
-            $myAssignments = OrderAssignment::where('employee_id', $employeeId)->get();
-
-            $query->whereHas('assignments', fn($q) => $q->where('employee_id', $employeeId));
-
-            $query->where(function ($q) use ($myAssignments, $employeeId) {
-                    foreach ($myAssignments as $assign) {
-                        $order = Order::find($assign->order_id);
-                        if (!$order) continue;
-
-                        // Get related assignments for this order
-                        $related = $order->assignments;
-
-                        // Check if user changed location
-                        $userChangedLocation = !is_null($assign->location) && $assign->location !== $assign->section;
-
-                        // CASE: Both employees swapped locations and both are incomplete
-                        $swapped = $related->first(function ($a) use ($assign, $employeeId) {
-                            return $a->employee_id !== $employeeId &&
-                                $a->section === $assign->location && // his section = my location
-                                $a->location === $assign->section && // his location = my section
-                                $a->garments_assigned === $assign->garments_assigned &&
-                                !$a->is_complete;
-                        });
-
-                        if ($userChangedLocation && !$assign->is_complete && $swapped) {
-                            $q->orWhere('id', $order->id); // ✅ show to both sides
-                            continue;
-                        }
-
-                        // CASE: Employee's section matches current location and location not changed
-                        if (
-                            is_null($assign->location) &&
-                            $order->current_location === $assign->section &&
-                            !$assign->is_complete
-                        ) {
-                            $q->orWhere('id', $order->id);
-                            continue;
-                        }
-
-                        // CASE: Someone handed off the order to me (one-way)
-                        $handoverToMe = $related->first(function ($a) use ($assign, $employeeId) {
-                            return $a->employee_id !== $employeeId &&
-                                $a->location === $assign->section &&
-                                $a->garments_assigned === $assign->garments_assigned &&
-                                !$a->is_complete;
-                        });
-
-                        if ($handoverToMe && !$assign->is_complete) {
-                            $q->orWhere('id', $order->id);
-                            continue;
-                        }
-
-                        // Optionally: allow viewing completed if still in same section
-                        if ($assign->is_complete && is_null($assign->location) && $order->current_location === $assign->section) {
-                            $q->orWhere('id', $order->id);
-                            continue;
-                        }
-
-                        // ❌ Default: skip everything else
-                    }
-                });
+        if (strlen($this->search) > 3) {
+            $query->searchLike(['order_number', 'current_location'], $this->search);
         }
-        // 📊 Filters
+
         if ($this->sort) {
             $query->orderBy($this->sort, $this->orderBy ?? 'asc');
         } else {
             $query->orderByDesc('is_priority')->orderBy('created_at', 'asc');
         }
 
-       if ($user->type == 2 && $this->locationFilter) {
+        if ($user->type == 2 && $this->locationFilter) {
             $query->whereHas('assignments', function ($q) use ($employeeId) {
-                $q->where('employee_id', $employeeId)
-                ->where('location', $this->locationFilter);
+                $q->where('employee_id', $employeeId)->where('location', $this->locationFilter);
             });
         }
 
-        if (strlen($this->search) > 3) {
-            $query->searchLike(['order_number', 'current_location'], $this->search);
+        // 👁️ Type 2: Apply order visibility rules (just like before)
+        if ($user->type == 2 && $employeeId) {
+            $filteredIds = (clone $query)->pluck('id')->toArray();
+            $visibleIds = [];
+
+            $myAssignments = OrderAssignment::where('employee_id', $employeeId)
+                ->whereIn('order_id', $filteredIds)
+                ->get();
+
+            foreach ($myAssignments as $assign) {
+                $order = Order::find($assign->order_id);
+                if (!$order) continue;
+                $related = $order->assignments;
+
+                $swapped = $related->first(fn($a) =>
+                    $a->employee_id !== $employeeId &&
+                    $a->section === $assign->location &&
+                    $a->location === $assign->section &&
+                    $a->garments_assigned === $assign->garments_assigned &&
+                    !$a->is_complete
+                );
+
+                if (!$assign->is_complete && $swapped && $assign->location !== null) {
+                    $visibleIds[] = $order->id;
+                    continue;
+                }
+
+                if (!$assign->is_complete && is_null($assign->location) && $order->current_location === $assign->section) {
+                    $visibleIds[] = $order->id;
+                    continue;
+                }
+
+                $handover = $related->first(fn($a) =>
+                    $a->employee_id !== $employeeId &&
+                    $a->location === $assign->section &&
+                    $a->garments_assigned === $assign->garments_assigned &&
+                    !$a->is_complete
+                );
+
+                if ($handover && !$assign->is_complete) {
+                    $visibleIds[] = $order->id;
+                    continue;
+                }
+
+                if ($assign->is_complete && is_null($assign->location) && $order->current_location === $assign->section) {
+                    $visibleIds[] = $order->id;
+                }
+            }
+
+            $query->whereIn('id', $visibleIds);
         }
 
-        $orders = $query->get();
+        // STEP 2: Paginate
+        $orders = $query->paginate(20);
+        $visibleOrderIds = $orders->getCollection()->pluck('id')->toArray();
 
-        // ✅ ETA Calculation
+        // STEP 3: Global ETA Calculation (on all DB assignments for employee)
         if ($user->type == 2 && $employeeId) {
             $employee = $user->employee;
+
             $startHour = Carbon::createFromFormat('H:i:s', $employee->working_hours_start);
             $endHour = Carbon::createFromFormat('H:i:s', $employee->working_hours_end);
             $timePerGarment = CarbonInterval::createFromFormat('H:i:s', $employee->time_per_garment);
             $cursorTime = $this->normalizeStartTime(Carbon::now(), $startHour, $endHour);
 
-            foreach ($orders as $order) {
-                $assignments = $order->assignments
-                    ->where('employee_id', $employeeId)
-                    ->sortBy(fn($a) => $this->getSectionPriority($a->section));
+            // 🔁 Get all incomplete assignments for this employee
+            $allAssignments = OrderAssignment::with('order')
+                ->where('employee_id', $employeeId)
+                ->whereHas('order', fn($q) => $q->where('status', 0))
+                ->where('is_complete', false)
+                ->get()
+                ->sortBy(function ($a) {
+                    return sprintf('%d-%d-%d',
+                        $a->order->is_priority ? 0 : 1,
+                        $this->getSectionPriority($a->section),
+                        $a->order->created_at->timestamp
+                    );
+                });
 
-                foreach ($assignments as $assignment) {
-                    if ($assignment->is_complete) continue;
+            $orderEtaMap = [];
 
-                    // if (!$this->hasCorrectSequentialDependency($order, $assignment)) {
-                    //     continue;
-                    // }
+            foreach ($allAssignments as $assignment) {
+                $eta = $cursorTime->copy();
+                $totalSeconds = $timePerGarment->totalSeconds * $assignment->garments_assigned;
 
-                    $eta = $cursorTime->copy();
-                    $totalSeconds = $timePerGarment->totalSeconds * $assignment->garments_assigned;
-                    $eta = $this->normalizeStartTime($eta, $startHour, $endHour);
+                $eta = $this->normalizeStartTime($eta, $startHour, $endHour);
+                $secondsLeft = $totalSeconds;
 
-                    $secondsLeft = $totalSeconds;
-                    while ($secondsLeft > 0) {
-                        if ($this->isWeekend($eta)) {
-                            $eta->addDay()->setTimeFrom($startHour);
-                            continue;
-                        }
-
-                        $endOfDay = $eta->copy()->setTimeFrom($endHour);
-                        $available = $eta->diffInSeconds($endOfDay);
-                        $consume = min($available, $secondsLeft);
-
-                        $eta->addSeconds($consume);
-                        $secondsLeft -= $consume;
-
-                        if ($secondsLeft > 0) {
-                            $eta->addDay()->setTimeFrom($startHour);
-                            while ($this->isWeekend($eta)) {
-                                $eta->addDay();
-                            }
-                        }
+                while ($secondsLeft > 0) {
+                    if ($this->isWeekend($eta)) {
+                        $eta->addDay()->setTimeFrom($startHour);
+                        continue;
                     }
 
-                    $order->eta_data = [
-                        'section' => $assignment->section,
-                        'garments' => $assignment->garments_assigned,
-                        'total_time' => gmdate('H:i:s', $totalSeconds),
-                        'expected_delivery' => $eta->toDateTimeString(),
-                    ];
+                    $endOfDay = $eta->copy()->setTimeFrom($endHour);
+                    $available = $eta->diffInSeconds($endOfDay);
+                    $consume = min($available, $secondsLeft);
 
-                    $cursorTime = $eta->copy();
-                    break;
+                    $eta->addSeconds($consume);
+                    $secondsLeft -= $consume;
+
+                    if ($secondsLeft > 0) {
+                        $eta->addDay()->setTimeFrom($startHour);
+                        while ($this->isWeekend($eta)) {
+                            $eta->addDay();
+                        }
+                    }
+                }
+
+                $cursorTime = $eta->copy();
+                $orderEtaMap[$assignment->order_id] = [
+                    'section' => $assignment->section,
+                    'garments' => $assignment->garments_assigned,
+                    'total_time' => gmdate('H:i:s', $totalSeconds),
+                    'expected_delivery' => $eta->toDateTimeString(),
+                ];
+            }
+
+            // STEP 4: Attach ETA to paginated orders
+            foreach ($orders->getCollection() as $order) {
+                if (isset($orderEtaMap[$order->id])) {
+                    $order->eta_data = $orderEtaMap[$order->id];
                 }
             }
         }
 
-        // 📦 Manual Pagination
-        $page = request()->get('page', 1);
-        $perPage = 20;
-
-        return new \Illuminate\Pagination\LengthAwarePaginator(
-            $orders->forPage($page, $perPage),
-            $orders->count(),
-            $perPage,
-            $page,
-            ['path' => request()->url(), 'query' => request()->query()]
-        );
+        return $orders;
     }
+
     private function getPreviousSection($section, Order $order)
     {
         $sections = ['Sewing', 'Embroidery', 'Imprinting'];
@@ -392,7 +560,7 @@ class ExternalPendingOrderComponent extends Component
 
         $user = auth()->user();
         $employeeId = $user->employee_id;
-
+        $order = Order::find($orderId);
         $assignments = OrderAssignment::where('order_id', $orderId)
             ->where('section', $stage)
             ->where('employee_id', $employeeId)
@@ -409,6 +577,14 @@ class ExternalPendingOrderComponent extends Component
             if ($type === 'progress') {
                 $assignment->is_progress = !$assignment->is_progress;
 
+                 $msg = $assignment->is_progress ? 'marked as In Progress' : 'unmarked as In Progress';
+
+                    OrderLog::forceCreate([
+                        'title' => "{$assignment->section} {$msg}",
+                        'updated_by' => $employeeId,
+                        'order_id' => $order->id,
+                    ]);
+
                 if ($assignment->is_progress) {
                     $progressChanged = true;
                 } else {
@@ -417,12 +593,24 @@ class ExternalPendingOrderComponent extends Component
             } elseif ($type === 'complete' && $assignment->is_progress) {
                 $assignment->is_complete = !$assignment->is_complete;
                 $completionChanged = true;
+                $msg = $assignment->is_complete ? 'marked as Complete' : 'unmarked as Complete';
+
+                OrderLog::forceCreate([
+                    'title' => "{$assignment->section} {$msg}",
+                    'updated_by' => $employeeId,
+                    'order_id' => $order->id,
+                ]);
+                if($assignment->is_complete == 0){
+                    $needField = 'need_' . strtolower($stage);
+                    if (in_array($needField, ['need_sewing', 'need_embroidery', 'need_imprinting'])) {
+                        $order->$needField = 2; }
+                }
             }
 
             $assignment->save();
         }
 
-        $order = Order::find($orderId);
+        
 
         // ✅ If marked progress, update progress field
        if ($order) {

@@ -1,5 +1,20 @@
 <div class="container-fluid p-0">
     <div class="row">
+        <style>
+            .subtle-checkbox {
+                border-radius: 4px !important;
+                border-color: #005cdd !important;
+                background-color: #7ece88 !important;
+                opacity: 0.7;
+            }
+            /* Ensure background color is visible on disabled checkboxes */
+            input[type="checkbox"].subtle-checkbox:disabled {
+                background-color: #7ece88 !important;
+                /* Optional: add a border color for disabled state if needed */
+                border-color: #b6bfc9 !important;
+                opacity: 0.7;
+            }
+        </style>
         @if (session()->has('message'))
             <div class="alert alert-primary" role="alert">
                 <strong class="text-white h5">{{ session('message') }}</strong>
@@ -66,298 +81,6 @@
                                     <th class="text-uppercase text-secondary text-xxs font-weight-bolder opacity-7">Action</th>
                                 </tr>
                             </thead>
-                            {{-- <tbody>
-                                @foreach($orders as $order)
-                                    @php
-                                        $employeeId = auth()->user()->employee_id;
-                                        $userDept = auth()->user()->employee?->department;
-
-                                        // Current user's assignments, section-keyed
-                                        $assignments = $order->assignments->where('employee_id', $employeeId)->keyBy('section');
-
-                                       $sewingProgress = isset($assignments['Sewing']) 
-                                            ? $assignments['Sewing']->is_progress 
-                                            : ($order->sewing_progress == 1);
-
-                                        $sewingComplete = isset($assignments['Sewing']) 
-                                            ? $assignments['Sewing']->is_complete 
-                                            : ($order->need_sewing == 1);
-
-                                        $embroideryProgress = isset($assignments['Embroidery']) 
-                                            ? $assignments['Embroidery']->is_progress 
-                                            : ($order->embroidery_progress == 1);
-
-                                        $embroideryComplete = isset($assignments['Embroidery']) 
-                                            ? $assignments['Embroidery']->is_complete 
-                                            : ($order->need_embroidery == 1);
-
-                                        $imprintingProgress = isset($assignments['Imprinting']) 
-                                            ? $assignments['Imprinting']->is_progress 
-                                            : ($order->imprinting_progress == 1);
-
-                                        $imprintingComplete = isset($assignments['Imprinting']) 
-                                            ? $assignments['Imprinting']->is_complete 
-                                            : ($order->need_imprinting == 1);
-
-
-                                        $highlightIfOtherNeed = function ($section) use ($order, $userDept) {
-                                            $needField = 'need_' . strtolower($section);
-                                            return $order->$needField && $section !== $userDept ? 'background-color: #d4edda;' : '';
-                                        };
-                                    @endphp
-
-
-                                    <tr @if($order->is_priority) style="background-color: #f8d7da;" @endif>
-                                        <!-- Date -->
-                                        <td><h6>{{ date('m-d-Y', strtotime($order->created_at)) }}</h6></td>
-
-                                        <!-- Order Number -->
-                                        <td><h6>{{ $order->order_number }}</h6></td>
-
-                                        <!-- Current Location -->
-                                        <td>
-                                            <select class="form-select form-select-lg"
-                                                    wire:model.live="orderLocations.{{ $order->id }}">
-                                                @foreach($order->assignments->pluck('section')->unique() as $section)
-                                                    <option value="{{ $section }}">
-                                                        {{ $section }}
-                                                    </option>
-                                                @endforeach
-                                            </select>
-                                        </td>
-
-
-
-
-                                        <!-- Sewing -->
-                                        <td class="align-middle text-center text-sm" style="border-right: 2px solid #e9ecef; border-left: 2px solid #e9ecef; {{ $highlightIfOtherNeed('Sewing') }}">
-                                            <div class="d-flex justify-content-center gap-2">
-                                                <div>
-                                                    <label class="d-block">In&#8209;Progress</label>
-                                                    <input type="checkbox"
-                                                        wire:click="confirmStageUpdate({{ $order->id }}, 'Sewing', 'progress')"
-                                                        @disabled(!isset($assignments['Sewing']))
-                                                        {{ $sewingProgress ? 'checked' : '' }}>
-                                                </div>
-                                                <div>
-                                                    <label class="d-block">Complete</label>
-                                                    <input type="checkbox"
-                                                        wire:click="confirmStageUpdate({{ $order->id }}, 'Sewing', 'complete')"
-                                                        @disabled(!isset($assignments['Sewing']) || !$sewingProgress)
-                                                        {{ $sewingComplete ? 'checked' : '' }}>
-                                                </div>
-                                            </div>
-                                        </td>
-
-                                        <!-- Embroidery -->
-                                        <td class="align-middle text-center text-sm" style="border-right: 2px solid #e9ecef; {{ $highlightIfOtherNeed('Embroidery') }}">
-                                            <div class="d-flex justify-content-center gap-2">
-                                                <div>
-                                                    <label class="d-block">In&#8209;Progress</label>
-                                                    <input type="checkbox"
-                                                        wire:click="confirmStageUpdate({{ $order->id }}, 'Embroidery', 'progress')"
-                                                        @disabled(!isset($assignments['Embroidery']))
-                                                        {{ $embroideryProgress ? 'checked' : '' }}>
-                                                </div>
-                                                <div>
-                                                    <label class="d-block">Complete</label>
-                                                    <input type="checkbox"
-                                                        wire:click="confirmStageUpdate({{ $order->id }}, 'Embroidery', 'complete')"
-                                                        @disabled(!isset($assignments['Embroidery']) || !$embroideryProgress)
-                                                        {{ $embroideryComplete ? 'checked' : '' }}>
-                                                </div>
-                                            </div>
-                                        </td>
-
-                                        <!-- Imprinting -->
-                                        <td class="align-middle text-center text-sm" style="border-right: 2px solid #e9ecef; {{ $highlightIfOtherNeed('Imprinting') }}">
-                                            <div class="d-flex justify-content-center gap-2">
-                                                <div>
-                                                    <label class="d-block">In&#8209;Progress</label>
-                                                    <input type="checkbox"
-                                                        wire:click="confirmStageUpdate({{ $order->id }}, 'Imprinting', 'progress')"
-                                                        @disabled(!isset($assignments['Imprinting']))
-                                                        {{ $imprintingProgress ? 'checked' : '' }}>
-                                                </div>
-                                                <div>
-                                                    <label class="d-block">Complete</label>
-                                                    <input type="checkbox"
-                                                        wire:click="confirmStageUpdate({{ $order->id }}, 'Imprinting', 'complete')"
-                                                        @disabled(!isset($assignments['Imprinting']) || !$imprintingProgress)
-                                                        {{ $imprintingComplete ? 'checked' : '' }}>
-                                                </div>
-                                            </div>
-                                        </td>
-
-                                        <!-- Delivery Date/Time -->
-                                        <td>
-                                            @if(!empty($order->eta_data))
-                                                {{ \Carbon\Carbon::parse($order->eta_data['expected_delivery'])->format('M d, Y h:i A') }}
-                                            @else
-                                                <span class="text-muted">—</span>
-                                            @endif
-                                        </td>
-
-                                        <!-- View Button -->
-                                        <td class="align-middle text-center text-sm">
-                                            <a href="{{ route('edit.orders.external', ['orderId' => $order->id]) }}">
-                                                <i class="fa fa-eye text-lg opacity-10" aria-hidden="true"></i>
-                                            </a>
-                                        </td>
-                                    </tr>
-                                @endforeach
-                            </tbody> --}}
-                            {{-- <tbody>
-                                @foreach($orders as $order)
-                                    @php
-                                        $employeeId = auth()->user()->employee_id;
-                                        $userDept = auth()->user()->employee?->department;
-
-                                        // Current user's assignments, section-keyed
-                                        $assignments = $order->assignments->where('employee_id', $employeeId)->keyBy('section');
-
-                                    $sewingProgress = isset($assignments['Sewing']) 
-                                            ? $assignments['Sewing']->is_progress 
-                                            : ($order->sewing_progress == 1);
-
-                                        $sewingComplete = isset($assignments['Sewing']) 
-                                            ? $assignments['Sewing']->is_complete 
-                                            : ($order->need_sewing == 1);
-
-                                        $embroideryProgress = isset($assignments['Embroidery']) 
-                                            ? $assignments['Embroidery']->is_progress 
-                                            : ($order->embroidery_progress == 1);
-
-                                        $embroideryComplete = isset($assignments['Embroidery']) 
-                                            ? $assignments['Embroidery']->is_complete 
-                                            : ($order->need_embroidery == 1);
-
-                                        $imprintingProgress = isset($assignments['Imprinting']) 
-                                            ? $assignments['Imprinting']->is_progress 
-                                            : ($order->imprinting_progress == 1);
-
-                                        $imprintingComplete = isset($assignments['Imprinting']) 
-                                            ? $assignments['Imprinting']->is_complete 
-                                            : ($order->need_imprinting == 1);
-
-                                        $getCheckboxClass = function ($section) use ($order, $userDept, $assignments) {
-                                            $needField = 'need_' . strtolower($section);
-
-                                            // if (isset($assignments[$section])) {
-                                            //     return 'border border-3 border-primary';
-                                            // }
-
-                                            if ($order->$needField && $section !== $userDept) {
-                                                return 'border border-3 border-success';
-                                            }
-
-                                            return '';
-                                        };
-                                    @endphp
-
-                                    <tr @if($order->is_priority) style="background-color: #f8d7da;" @endif>
-                                        <!-- Date -->
-                                        <td><h6>{{ date('m-d-Y', strtotime($order->created_at)) }}</h6></td>
-
-                                        <!-- Order Number -->
-                                        <td><h6>{{ $order->order_number }}</h6></td>
-
-                                        <!-- Current Location -->
-                                        <td>
-                                            <select class="form-select form-select-lg"
-                                                    wire:model.live="orderLocations.{{ $order->id }}">
-                                                @foreach($order->assignments->pluck('section')->unique() as $section)
-                                                    <option value="{{ $section }}">
-                                                        {{ $section }}
-                                                    </option>
-                                                @endforeach
-                                            </select>
-                                        </td>
-
-                                        <!-- Sewing -->
-                                        <td class="align-middle text-center text-sm" style="border-right: 2px solid #e9ecef; border-left: 2px solid #e9ecef;">
-                                            <div class="d-flex justify-content-center gap-2">
-                                                <div>
-                                                    <label class="d-block">In&#8209;Progress</label>
-                                                    <input type="checkbox"
-                                                        class="{{ $getCheckboxClass('Sewing') }}"
-                                                        wire:click="confirmStageUpdate({{ $order->id }}, 'Sewing', 'progress')"
-                                                        @disabled(!isset($assignments['Sewing']))
-                                                        {{ $sewingProgress ? 'checked' : '' }}>
-                                                </div>
-                                                <div>
-                                                    <label class="d-block">Complete</label>
-                                                    <input type="checkbox"
-                                                        class="{{ $getCheckboxClass('Sewing') }}"
-                                                        wire:click="confirmStageUpdate({{ $order->id }}, 'Sewing', 'complete')"
-                                                        @disabled(!isset($assignments['Sewing']) || !$sewingProgress)
-                                                        {{ $sewingComplete ? 'checked' : '' }}>
-                                                </div>
-                                            </div>
-                                        </td>
-
-                                        <!-- Embroidery -->
-                                        <td class="align-middle text-center text-sm" style="border-right: 2px solid #e9ecef;">
-                                            <div class="d-flex justify-content-center gap-2">
-                                                <div>
-                                                    <label class="d-block">In&#8209;Progress</label>
-                                                    <input type="checkbox"
-                                                        class="{{ $getCheckboxClass('Embroidery') }}"
-                                                        wire:click="confirmStageUpdate({{ $order->id }}, 'Embroidery', 'progress')"
-                                                        @disabled(!isset($assignments['Embroidery']))
-                                                        {{ $embroideryProgress ? 'checked' : '' }}>
-                                                </div>
-                                                <div>
-                                                    <label class="d-block">Complete</label>
-                                                    <input type="checkbox"
-                                                        class="{{ $getCheckboxClass('Embroidery') }}"
-                                                        wire:click="confirmStageUpdate({{ $order->id }}, 'Embroidery', 'complete')"
-                                                        @disabled(!isset($assignments['Embroidery']) || !$embroideryProgress)
-                                                        {{ $embroideryComplete ? 'checked' : '' }}>
-                                                </div>
-                                            </div>
-                                        </td>
-
-                                        <!-- Imprinting -->
-                                        <td class="align-middle text-center text-sm" style="border-right: 2px solid #e9ecef;">
-                                            <div class="d-flex justify-content-center gap-2">
-                                                <div>
-                                                    <label class="d-block">In&#8209;Progress</label>
-                                                    <input type="checkbox"
-                                                        class="{{ $getCheckboxClass('Imprinting') }}"
-                                                        wire:click="confirmStageUpdate({{ $order->id }}, 'Imprinting', 'progress')"
-                                                        @disabled(!isset($assignments['Imprinting']))
-                                                        {{ $imprintingProgress ? 'checked' : '' }}>
-                                                </div>
-                                                <div>
-                                                    <label class="d-block">Complete</label>
-                                                    <input type="checkbox"
-                                                        class="{{ $getCheckboxClass('Imprinting') }}"
-                                                        wire:click="confirmStageUpdate({{ $order->id }}, 'Imprinting', 'complete')"
-                                                        @disabled(!isset($assignments['Imprinting']) || !$imprintingProgress)
-                                                        {{ $imprintingComplete ? 'checked' : '' }}>
-                                                </div>
-                                            </div>
-                                        </td>
-
-                                        <!-- Delivery Date/Time -->
-                                        <td>
-                                            @if(!empty($order->eta_data))
-                                                {{ \Carbon\Carbon::parse($order->eta_data['expected_delivery'])->format('M d, Y h:i A') }}
-                                            @else
-                                                <span class="text-muted">—</span>
-                                            @endif
-                                        </td>
-
-                                        <!-- View Button -->
-                                        <td class="align-middle text-center text-sm">
-                                            <a href="{{ route('edit.orders.external', ['orderId' => $order->id]) }}">
-                                                <i class="fa fa-eye text-lg opacity-10" aria-hidden="true"></i>
-                                            </a>
-                                        </td>
-                                    </tr>
-                                @endforeach
-                            </tbody> --}}
                             <tbody>
                                 @foreach($orders as $order)
                                     @php
@@ -394,7 +117,7 @@
                                         $getCheckboxClass = function ($section) use ($order, $userDept, $assignments) {
                                             $needField = 'need_' . strtolower($section);
                                             if ($order->$needField && $section !== $userDept) {
-                                                return 'border border-3 border-success';
+                                                 return 'border border-2 border-info subtle-checkbox';
                                             }
                                             return '';
                                         };
