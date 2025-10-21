@@ -15,6 +15,7 @@ use App\Livewire\Order\RemovedOrderComponent;
 use App\Models\Order;
 use Illuminate\Support\Facades\Route;
 use App\Http\Middleware\RestrictExternalEmployees;
+use App\Livewire\BestEmployeeFinder;
 
 /*
 |--------------------------------------------------------------------------
@@ -39,6 +40,7 @@ Route::middleware(['auth'])->group(function () {
         Route::get('edit/order', OrderEditComponent::class)->name('order.edit');
         Route::get('employee', Employee::class)->name('employee');
         Route::get('external/employee', ExternalEmployee::class)->name('external-employee');
+        Route::get('best/employee', BestEmployeeFinder::class)->name('eta generator');
     });
 
     // ✅ External employee routes (accessible by user type 2)

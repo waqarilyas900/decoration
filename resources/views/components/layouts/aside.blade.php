@@ -15,6 +15,20 @@
         @endphp
         <ul class="navbar-nav">
             @if ($user->type != 2)
+            <li class="nav-item mt-2">
+                <a class="nav-link {{ \Request::route()->getName() == 'eta generator' ? 'active' : '' }}"
+                    href="{{ route('eta generator') }}">
+                    <div
+                        class="icon icon-shape icon-sm shadow border-radius-md text-center me-2 d-flex align-items-center justify-content-center">
+                        <i class="fa fa-clock text-lg opacity-10" aria-hidden="true"></i>
+                    </div>
+                    <span
+                        class="nav-link-text ms-1 h5 mb-0 {{ \Request::route()->getName() == 'eta.generator' ? 'text-primary' : '' }}">
+                        ETA GENERATOR
+                    </span>
+                </a>
+            </li>
+
             <li class="nav-item">
                 <a class="nav-link  {{ \Request::route()->getName() == 'order.create' ? 'active' : '' }}"
                     href="{{ route('order.create') }}">

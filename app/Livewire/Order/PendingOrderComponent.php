@@ -19,6 +19,7 @@ use Livewire\Attributes\Session;
 use Livewire\Attributes\Url;
 use Livewire\Attributes\On;
 use Illuminate\Support\Str;
+use App\Services\EtaService;
 
 class PendingOrderComponent extends Component 
 {
@@ -47,8 +48,11 @@ class PendingOrderComponent extends Component
         'date' => null,
     ];
     public string $calculationTime;
-    public function mount()
+    protected EtaService $etaService;
+
+    public function mount(EtaService $etaService)
     {
+    $this->etaService = $etaService;
         $this->employees = Employee::where('type', 2)
             ->where('active', 1)
             ->where('is_delete', 0)
@@ -89,44 +93,199 @@ class PendingOrderComponent extends Component
         $this->resetPage();
     }
 
+    // public function orders()
+    // {
+    //     $query = Order::with('assignments.employee')->where('status', 0);
+    //     $user = auth()->user();
+
+    //     if ($user->type == 2) {
+    //         $employeeId = $user->employee_id;
+    //         $assignedSections = \App\Models\OrderAssignment::where('employee_id', $employeeId)
+    //             ->pluck('section')->toArray();
+
+    //         $query->where(function ($q) use ($employeeId, $assignedSections) {
+    //             $q->whereHas('assignments', fn($q2) => $q2->where('employee_id', $employeeId))
+    //             ->whereIn('current_location', $assignedSections);
+    //         })->orWhere(function ($q) use ($employeeId) {
+    //             $q->whereHas('assignments', fn($q2) => $q2->where('employee_id', $employeeId))
+    //             ->where(function ($inner) {
+    //                 $inner->where('need_sewing', 1)
+    //                         ->orWhere('need_embroidery', 1)
+    //                         ->orWhere('need_imprinting', 1);
+    //             });
+    //         });
+    //     }
+
+    //     if ($this->internal_employee) {
+    //         $query->where('created_by', $this->internal_employee);
+    //     }
+
+    //     if ($this->external_employee) {
+    //         $query->whereHas('assignments', function ($q) {
+    //             $q->where('employee_id', $this->external_employee);
+    //         });
+    //     }
+
+    //     // Sorting
+    //     if ($this->sort) {
+    //         $query->orderBy($this->sort, $this->orderBy);
+    //     } else {
+    //         $query->orderByDesc('is_priority')->orderBy('created_at', 'asc');
+    //     }
+
+    //     if ($this->location) {
+    //         $query->where('current_location', $this->location);
+    //     }
+
+    //     if (strlen($this->search) > 3) {
+    //         $query->searchLike(['order_number', 'current_location'], $this->search);
+    //     }
+
+    //     $baseQuery = clone $query;
+
+    //     // 🔁 Paginate after cloning
+    //     $orders = $query->paginate(20);
+    //     $paginatedOrderIds = $orders->pluck('id');
+
+    //     if ($user->type !== 2) {
+    //     // ✅ Get ALL matching orders across all pages (clone the query without pagination)
+    //     $employeeAssignments = OrderAssignment::with(['employee', 'order'])
+    //         ->whereHas('order', fn($q) => $q->where('status', 0))
+    //         ->where('is_complete', false)
+    //         ->get()
+    //         ->groupBy('employee_id');
+
+
+
+    //         $cursorTimes = [];
+    //         $orderEtaTracker = []; // Track latest ETA per order
+
+    //         foreach ($employeeAssignments as $employeeId => $assignments) {
+    //             $employee = $assignments->first()->employee;
+    //             if (!$employee) continue;
+
+    //             $startHour = Carbon::createFromFormat('H:i:s', $employee->working_hours_start);
+    //             $endHour = Carbon::createFromFormat('H:i:s', $employee->working_hours_end);
+    //             $timePerGarment = CarbonInterval::createFromFormat('H:i:s', $employee->time_per_garment);
+    //             $baseTime = Carbon::parse($this->calculationTime);
+    //             $cursorTimes[$employeeId] = $this->normalizeStartTime($baseTime->copy(), $startHour, $endHour);
+
+    //             $assignments = $assignments->sortBy(function ($a) {
+    //                 return sprintf(
+    //                     '%d-%d-%d',
+    //                     $a->order->is_priority ? 0 : 1,
+    //                     $this->getSectionPriority($a->section),
+    //                     $a->order->created_at->timestamp
+    //                 );
+    //             });
+
+    //             foreach ($assignments as $assignment) {
+    //                 $eta = $cursorTimes[$employeeId]->copy();
+    //                 $totalSeconds = $timePerGarment->totalSeconds * $assignment->garments_assigned;
+
+    //                 $eta = $this->normalizeStartTime($eta, $startHour, $endHour);
+    //                 $secondsLeft = $totalSeconds;
+
+    //                 while ($secondsLeft > 0) {
+    //                     if ($this->isWeekend($eta)) {
+    //                         $eta->addDay()->setTimeFrom($startHour);
+    //                         continue;
+    //                     }
+
+    //                     $endOfDay = $eta->copy()->setTimeFrom($endHour);
+    //                     $available = $eta->diffInSeconds($endOfDay);
+    //                     $consume = min($available, $secondsLeft);
+
+    //                     $eta->addSeconds($consume);
+    //                     $secondsLeft -= $consume;
+
+    //                     if ($secondsLeft > 0) {
+    //                         $eta->addDay()->setTimeFrom($startHour);
+    //                         while ($this->isWeekend($eta)) {
+    //                             $eta->addDay();
+    //                         }
+    //                     }
+    //                 }
+
+    //                 $cursorTimes[$employeeId] = $eta->copy();
+
+    //                 // Track max ETA per order
+    //                 $orderId = $assignment->order_id;
+    //                 if (!$assignment->is_complete) {
+    //                     if (!isset($orderEtaTracker[$orderId]) || $eta->greaterThan($orderEtaTracker[$orderId])) {
+    //                         $orderEtaTracker[$orderId] = $eta->copy();
+    //                     }
+    //                 }
+
+    //                 // ✅ LOG each assignment’s ETA for debugging
+    //                 Log::debug('Order Assignment ETA', [
+    //                     'employee_id'       => $employeeId,
+    //                     'employee_name'     => $employee->first_name . ' ' . $employee->last_name,
+    //                     'order_id'          => $orderId,
+    //                     'section'           => $assignment->section,
+    //                     'garments_assigned' => $assignment->garments_assigned,
+    //                     'assignment_eta'    => $eta->toDateTimeString(),
+    //                 ]);
+    //             }
+    //         }
+
+    //         // Now set expected_delivery on paginated orders
+    //         foreach ($orders as $order) {
+    //             if (isset($orderEtaTracker[$order->id])) {
+    //                 $order->expected_delivery = $orderEtaTracker[$order->id]->toDateTimeString();
+
+    //                 // ✅ LOG final expected delivery per order
+    //                 Log::info('Order Expected Delivery', [
+    //                     'order_id'           => $order->id,
+    //                     'expected_delivery'  => $order->expected_delivery,
+    //                 ]);
+    //             }
+    //         }
+
+    //     }
+
+
+
+    //     return $orders;
+    // }
     public function orders()
     {
-        $query = Order::with('assignments.employee')->where('status', 0);
+        $query = Order::with('assignments.employee')
+            ->where('status', 0);
+
         $user = auth()->user();
 
+        // ✅ Filter for logged-in employee (type 2)
         if ($user->type == 2) {
             $employeeId = $user->employee_id;
-            $assignedSections = \App\Models\OrderAssignment::where('employee_id', $employeeId)
-                ->pluck('section')->toArray();
 
-            $query->where(function ($q) use ($employeeId, $assignedSections) {
-                $q->whereHas('assignments', fn($q2) => $q2->where('employee_id', $employeeId))
-                ->whereIn('current_location', $assignedSections);
-            })->orWhere(function ($q) use ($employeeId) {
-                $q->whereHas('assignments', fn($q2) => $q2->where('employee_id', $employeeId))
-                ->where(function ($inner) {
-                    $inner->where('need_sewing', 1)
-                            ->orWhere('need_embroidery', 1)
-                            ->orWhere('need_imprinting', 1);
+            $assignedSections = OrderAssignment::where('employee_id', $employeeId)
+                ->pluck('section')
+                ->toArray();
+
+            $query->where(function ($outer) use ($employeeId, $assignedSections) {
+                $outer->where(function ($q) use ($employeeId, $assignedSections) {
+                    $q->whereHas('assignments', fn($q2) => $q2->where('employee_id', $employeeId))
+                    ->whereIn('current_location', $assignedSections);
+                })
+                ->orWhere(function ($q) use ($employeeId) {
+                    $q->whereHas('assignments', fn($q2) => $q2->where('employee_id', $employeeId))
+                    ->where(function ($inner) {
+                        $inner->where('need_sewing', 1)
+                                ->orWhere('need_embroidery', 1)
+                                ->orWhere('need_imprinting', 1);
+                    });
                 });
             });
         }
 
+        // ✅ Additional filters
         if ($this->internal_employee) {
             $query->where('created_by', $this->internal_employee);
         }
 
         if ($this->external_employee) {
-            $query->whereHas('assignments', function ($q) {
-                $q->where('employee_id', $this->external_employee);
-            });
-        }
-
-        // Sorting
-        if ($this->sort) {
-            $query->orderBy($this->sort, $this->orderBy);
-        } else {
-            $query->orderByDesc('is_priority')->orderBy('created_at', 'asc');
+            $query->whereHas('assignments', fn($q) => $q->where('employee_id', $this->external_employee));
         }
 
         if ($this->location) {
@@ -137,99 +296,40 @@ class PendingOrderComponent extends Component
             $query->searchLike(['order_number', 'current_location'], $this->search);
         }
 
-        $baseQuery = clone $query;
+        // ✅ Sorting
+        if ($this->sort) {
+            $query->orderBy($this->sort, $this->orderBy);
+        } else {
+            // Priority orders first, then oldest created
+            $query->orderByDesc('is_priority')
+                ->orderBy('created_at', 'asc');
+        }
 
-        // 🔁 Paginate after cloning
+        // ✅ Paginate at the end
         $orders = $query->paginate(20);
-        $paginatedOrderIds = $orders->pluck('id');
 
-        if ($user->type !== 2) {
-        // ✅ Get ALL matching orders across all pages (clone the query without pagination)
-        $employeeAssignments = OrderAssignment::with(['employee', 'order'])
-            ->whereHas('order', fn($q) => $q->where('status', 0))
-            ->where('is_complete', false)
-            ->get()
-            ->groupBy('employee_id');
+        // ✅ Non-employee users: calculate ETA using service
+        if ($user->type !== 2 && $orders->count()) {
+            $etaService = app(\App\Services\EtaService::class);
+            
+            // Get all order ETAs at once
+            $result = $etaService->calculateEtas();
+            $orderEtas = $result['orderEtas']; // [order_id => Carbon]
 
-
-
-            $cursorTimes = [];
-            $orderEtaTracker = []; // Track latest ETA per order
-
-            foreach ($employeeAssignments as $employeeId => $assignments) {
-                $employee = $assignments->first()->employee;
-                if (!$employee) continue;
-
-                $startHour = Carbon::createFromFormat('H:i:s', $employee->working_hours_start);
-                $endHour = Carbon::createFromFormat('H:i:s', $employee->working_hours_end);
-                $timePerGarment = CarbonInterval::createFromFormat('H:i:s', $employee->time_per_garment);
-                $baseTime = Carbon::parse($this->calculationTime);
-                $cursorTimes[$employeeId] = $this->normalizeStartTime($baseTime->copy(), $startHour, $endHour);
-
-
-                // Sort assignments by priority & order creation
-               $assignments = $assignments->sortBy(function ($a) {
-                    return sprintf(
-                        '%d-%d-%d',
-                        $a->order->is_priority ? 0 : 1, // priority orders first (0), then non-priority (1)
-                        $this->getSectionPriority($a->section), // section priority
-                        $a->order->created_at->timestamp // oldest first
-                    );
-                });
-
-
-                foreach ($assignments as $assignment) {
-                    $eta = $cursorTimes[$employeeId]->copy();
-                    $totalSeconds = $timePerGarment->totalSeconds * $assignment->garments_assigned;
-
-                    $eta = $this->normalizeStartTime($eta, $startHour, $endHour);
-                    $secondsLeft = $totalSeconds;
-
-                    while ($secondsLeft > 0) {
-                        if ($this->isWeekend($eta)) {
-                            $eta->addDay()->setTimeFrom($startHour);
-                            continue;
-                        }
-
-                        $endOfDay = $eta->copy()->setTimeFrom($endHour);
-                        $available = $eta->diffInSeconds($endOfDay);
-                        $consume = min($available, $secondsLeft);
-
-                        $eta->addSeconds($consume);
-                        $secondsLeft -= $consume;
-
-                        if ($secondsLeft > 0) {
-                            $eta->addDay()->setTimeFrom($startHour);
-                            while ($this->isWeekend($eta)) {
-                                $eta->addDay();
-                            }
-                        }
-                    }
-
-                    $cursorTimes[$employeeId] = $eta->copy();
-
-                    // Track max ETA per order
-                    $orderId = $assignment->order_id;
-                    if (!$assignment->is_complete) {
-                        if (!isset($orderEtaTracker[$orderId]) || $eta->greaterThan($orderEtaTracker[$orderId])) {
-                            $orderEtaTracker[$orderId] = $eta->copy();
-                        }
-                    }
-                }
-            }
-
-            // Now set expected_delivery on paginated orders
             foreach ($orders as $order) {
-                if (isset($orderEtaTracker[$order->id])) {
-                    $order->expected_delivery = $orderEtaTracker[$order->id]->toDateTimeString();
+                if (isset($orderEtas[$order->id])) {
+                    $order->expected_delivery = $orderEtas[$order->id]->toDateTimeString();
                 }
             }
         }
 
 
-
         return $orders;
     }
+
+
+
+
     protected function getSectionPriority($section)
     {
         return match ($section) {
@@ -300,6 +400,7 @@ class PendingOrderComponent extends Component
     {
         return $date->isSaturday() || $date->isSunday();
     }
+   
     // public function calculateOverallEta()
     // {
     //     $employeeAssignments = OrderAssignment::with(['employee', 'order'])
@@ -363,21 +464,16 @@ class PendingOrderComponent extends Component
 
     //     // Final maximum ETA
     //     $maxEta = collect($orderEtaTracker)->max();
-    //      $this->overallEta = $maxEta;
+    //     $this->overallEta = $maxEta;
 
     //     if ($maxEta) {
     //         $now = Carbon::now();
     //         $diffInDays = $now->diffInDays($maxEta);
-    //         $diff = $now->diff($maxEta);
 
-    //         $months = $diff->m + ($diff->y * 12);
-    //         $daysRemaining = $diffInDays - ($months * 30);
-    //         $weeks = floor($daysRemaining / 7);
-    //         $days = $daysRemaining % 7;
+    //         $weeks = floor($diffInDays / 7);
+    //         $days = $diffInDays % 7;
 
-    //         // Build parts
     //         $parts = [];
-    //         if ($months > 0) $parts[] = $months . ' ' . Str::plural('Month', $months);
     //         if ($weeks > 0) $parts[] = $weeks . ' ' . Str::plural('Week', $weeks);
     //         if ($days > 0 || empty($parts)) $parts[] = $days . ' ' . Str::plural('Day', $days);
 
@@ -397,98 +493,21 @@ class PendingOrderComponent extends Component
     //         ];
     //     }
     // }
-    public function calculateOverallEta()
-    {
-        $employeeAssignments = OrderAssignment::with(['employee', 'order'])
-            ->whereHas('order', fn($q) => $q->where('status', 0))
-            ->where('is_complete', false)
-            ->get()
-            ->groupBy('employee_id');
+   public function calculateOverallEta()
+{
+    $service = new EtaService();
+    $result = $service->calculateEtas($this->calculationTime);
 
-        $cursorTimes = [];
-        $orderEtaTracker = [];
+    $this->overallEtaBreakdown = $result['overallEtaBreakdown'];
 
-        foreach ($employeeAssignments as $employeeId => $assignments) {
-            $employee = $assignments->first()->employee;
-            if (!$employee) continue;
-
-            $startHour = Carbon::createFromFormat('H:i:s', $employee->working_hours_start);
-            $endHour = Carbon::createFromFormat('H:i:s', $employee->working_hours_end);
-            $timePerGarment = CarbonInterval::createFromFormat('H:i:s', $employee->time_per_garment);
-            $cursorTimes[$employeeId] = $this->normalizeStartTime(Carbon::now(), $startHour, $endHour);
-
-            $assignments = $assignments->sortBy(fn($a) =>
-                $this->getSectionPriority($a->section) . '-' . $a->order->created_at->timestamp
-            );
-
-            foreach ($assignments as $assignment) {
-                $eta = $cursorTimes[$employeeId]->copy();
-                $totalSeconds = $timePerGarment->totalSeconds * $assignment->garments_assigned;
-
-                $eta = $this->normalizeStartTime($eta, $startHour, $endHour);
-                $secondsLeft = $totalSeconds;
-
-                while ($secondsLeft > 0) {
-                    if ($this->isWeekend($eta)) {
-                        $eta->addDay()->setTimeFrom($startHour);
-                        continue;
-                    }
-
-                    $endOfDay = $eta->copy()->setTimeFrom($endHour);
-                    $available = $eta->diffInSeconds($endOfDay);
-                    $consume = min($available, $secondsLeft);
-
-                    $eta->addSeconds($consume);
-                    $secondsLeft -= $consume;
-
-                    if ($secondsLeft > 0) {
-                        $eta->addDay()->setTimeFrom($startHour);
-                        while ($this->isWeekend($eta)) {
-                            $eta->addDay();
-                        }
-                    }
-                }
-
-                $cursorTimes[$employeeId] = $eta->copy();
-
-                $orderId = $assignment->order_id;
-                if (!isset($orderEtaTracker[$orderId]) || $eta->greaterThan($orderEtaTracker[$orderId])) {
-                    $orderEtaTracker[$orderId] = $eta->copy();
-                }
-            }
-        }
-
-        // Final maximum ETA
-        $maxEta = collect($orderEtaTracker)->max();
-        $this->overallEta = $maxEta;
-
-        if ($maxEta) {
-            $now = Carbon::now();
-            $diffInDays = $now->diffInDays($maxEta);
-
-            $weeks = floor($diffInDays / 7);
-            $days = $diffInDays % 7;
-
-            $parts = [];
-            if ($weeks > 0) $parts[] = $weeks . ' ' . Str::plural('Week', $weeks);
-            if ($days > 0 || empty($parts)) $parts[] = $days . ' ' . Str::plural('Day', $days);
-
-            $last = array_pop($parts);
-            $readable = count($parts)
-                ? implode(', ', $parts) . ' and ' . $last
-                : $last;
-
-            $this->overallEtaBreakdown = [
-                'readable' => $readable,
-                'date' => $maxEta->format('M d, Y'),
-            ];
-        } else {
-            $this->overallEtaBreakdown = [
-                'readable' => null,
-                'date' => null,
-            ];
+    // Also annotate your orders if needed
+    foreach ($this->orders() as $order) {
+        if (isset($result['orderEtas'][$order->id])) {
+            $order->expected_delivery = $result['orderEtas'][$order->id]->toDateTimeString();
         }
     }
+}
+
 
     public function sortData($sort, $orderBy)
     {
